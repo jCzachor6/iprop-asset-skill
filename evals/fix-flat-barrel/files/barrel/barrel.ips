@@ -1,0 +1,24 @@
+asset Barrel {
+  size 32x40
+  input u32 style = 1
+  draw {
+    w = 10 + int(unit() * 3)
+    h = 30 + int(unit() * 4)
+    c = rgb(100 + int(unit() * 40), 60 + int(unit() * 30), 30 + int(unit() * 20))
+    for y in 0..40 {
+      for x in 0..32 {
+        dx = float(x) - 16.0
+        dy = float(y) - 20.0
+        if (abs(dx) < float(w) && abs(dy) < float(h) * 0.5) {
+          pixel(x, y, c)
+        }
+      }
+    }
+    if (style == 1) {
+      rect(16 - w, 12, w * 2, 2, #555555)
+      rect(16 - w, 26, w * 2, 2, #555555)
+    } else {
+      rect(16 - w, 19, w * 2, 2, #555555)
+    }
+  }
+}

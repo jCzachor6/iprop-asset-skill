@@ -1,0 +1,9 @@
+// Lint fixture: every pixel draws its own colour, so the texture reads as static.
+asset Noisy {
+  size 32x32
+  draw {
+    for y in 4..28 {
+      for x in 4..28 { pixel(x, y, #305070 to #c0d8f0) }
+    }
+  }
+}

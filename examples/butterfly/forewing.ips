@@ -1,0 +1,25 @@
+// forewing.ips: the right forewing and the antenna of a butterfly,
+// as a program of its own with a whole fuel budget for detail (wing.ips
+// with which = 1 and detail = 1). A host can render
+// forewing.ips, hindwing.ips and body.ips with one seed, mirror the wings
+// and compose a symmetric butterfly. Local x = 0 is the body axis, so the
+// wing touches the left edge by design (check with --allow-edge).
+// Variety: extreme
+
+import wing from "wing.ips"
+
+asset ButterflyForewing {
+  size 128x256
+  input u32 style = 0
+  input color tint = #00000000
+  input u32 shadow = 1
+  input u32 scheme = 0
+  input u32 motif = 0
+
+  draw {
+    layer side(alpha=surface.source_over) {
+      wing.draw(seed, at={0, 0}, style=style, tint=tint, shadow=shadow, scheme=scheme, motif=motif, which=1, detail=1)
+    }
+    surface.paint(side, blend=surface.source_over)
+  }
+}

@@ -1,0 +1,11 @@
+schema_version: "1.1"
+name: fix-flat-barrel
+expected_outcome: |
+  barrel/barrel.ips is rewritten in the current house style and still is a 32x40 asset: draws use
+  `to` ranges shaped with distributions instead of unit() arithmetic, colours are gradients or
+  palettes instead of channel-by-channel draws, the style input defaults to rolling from the seed,
+  the body is painted in rows rather than a per-pixel loop (lower fuel), the barrel is shaded with
+  a tone ramp and has a readable edge, and seeds differ visibly in shape and colour. It compiles
+  with 0.8.0 and renders seeds 1-200 without traps.
+context:
+  scaffold_script: place-files.sh

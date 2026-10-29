@@ -1,0 +1,5 @@
+// Lint fixture: one flat colour, so the silhouette has no outline or rim light.
+asset Flat {
+  size 32x32
+  draw { oval(16, 16, 11, 9, #7a8a9a) }
+}

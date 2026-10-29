@@ -1,0 +1,72 @@
+// butterfly.ips: a butterfly seen from above, 256x256, painted like a
+// photograph and often in fantasy colours, with no bitmaps.
+//
+// A seed alone gives a completely random butterfly: its species style, wing
+// shape and size, colours, spots, eyespots, bands, veins, body and antennae.
+// One side's wings and antenna (wing.ips) are drawn twice with the same
+// seed, the second time mirrored, so the wings are symmetric to the pixel.
+// The body (body.ips) is drawn once over both, from the wing part's sizes and
+// colour scheme.
+//
+// Inputs:
+//   style  0 rolls a style from the seed; 1 monarch, 2 swallowtail, 3 morpho,
+//          4 white or sulphur, 5 peacock, 6 admiral, 7 longwing,
+//          8 fritillary, 9 blue, 10 emerald or birdwing, 11 glasswing,
+//          12 satyr, 13 copper
+//   tint   transparent rolls the wing colour; any other colour sets it
+//   shadow 1 casts a soft shadow under the wings, 0 leaves it out
+//   scheme 0 rolls a colour scheme; 1 natural, 2 pastel, 3 neon, 4 dark,
+//          5 light, 6 magic (hue gradient, sheen, glints), 7 aberrant (the
+//          style in another hue), 8 gradient, 9 duo, 10 nebula, 11 opal,
+//          12 flame, 13 frost, 14 prism. A tint keeps the natural scheme.
+//   motif  0 rolls an abstract motif; 1 none, 2 ripples, 3 marble, 4 filigree,
+//          5 stardust, 6 orbs, 7 sunburst, 8 shimmer, 9 pearls (marble and
+//          shimmer are drawn as ripples and sunburst here)
+// Outputs:
+//   anchor    the thorax, where the wings meet the body
+//   collider  the bounds of the wings, body and antennae
+//
+// Variety: extreme
+
+import wing from "wing.ips"
+import body from "body.ips"
+
+asset Butterfly {
+  size 256x256
+  origin 128,128
+  input u32 style = 0
+  input color tint = #00000000
+  input u32 shadow = 1
+  input u32 scheme = 0
+  input u32 motif = 0
+
+  output point anchor
+  output rect collider
+
+  draw {
+    // wing.ips resolves a rolled style and scheme from the seed; the body
+    // takes the resolved pair from its design output.
+    layer scene(alpha=surface.source_over) {
+      wing.draw(seed, at={128, 0}, style=style, tint=tint, shadow=shadow, scheme=scheme, motif=motif)
+      root = wing.outputs.wingRoot
+      reach = wing.outputs.extent
+      foot = wing.outputs.foot
+      // Data points carry the values in x - 128 (the placement) and y.
+      span = wing.outputs.span
+      build = wing.outputs.build
+      shift = wing.outputs.shift
+      level = wing.outputs.level
+      dusk = wing.outputs.dusk
+      design = wing.outputs.design
+      wing.draw(seed, at={0, 0}, mirror_x=1, style=style, tint=tint, shadow=shadow, scheme=scheme, motif=motif, report=0)
+      body.draw(seed, at={128.0, root.y}, style=int(design.x - 128.0 + 0.5), fore=span.x - 128.0, hind=span.y,
+                thorax=build.x - 128.0, abdomen=build.y, hue=shift.x - 128.0, saturation=shift.y,
+                value=level.x - 128.0, lift=level.y, sink=dusk.x - 128.0)
+    }
+    surface.paint(scene, blend=surface.source_over)
+
+    anchor = {128.0, root.y}
+    width = (reach.x - 128.0) * 2.0
+    collider = {256.0 - reach.x, reach.y, width, foot.y - reach.y}
+  }
+}

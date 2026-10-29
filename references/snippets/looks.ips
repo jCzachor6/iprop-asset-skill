@@ -1,0 +1,16 @@
+// looks.ips — a material library: no asset, only materials (and their own palettes and consts).
+palette woods = [#5a4230 to #7a5c40, #6a5a48 to #8a7a64]
+const distribution kinds = weighted {0: 70, 1: 30}
+
+material Wood {
+  base = woods[0 to 1 with kinds].pick()
+  shadow = color.mix(base, #1a1428, 0.45)
+  light = color.mix(base, #fff0c0, 0.35)
+  edge = color.mix(base, #0c0808, 0.8)
+}
+
+material Iron {
+  base = #6e7880 to #8a949c
+  shadow = color.mix(base, #10161e, 0.5)
+  light = color.mix(base, #f0f6ff, 0.45)
+}

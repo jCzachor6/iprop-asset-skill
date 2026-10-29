@@ -1,0 +1,12 @@
+// Lint fixture: two tones in a checkerboard instead of clean bands.
+asset Dithered {
+  size 32x32
+  draw {
+    rect(3, 3, 26, 26, #1c2a38)
+    for y in 4..28 {
+      for x in 4..28 {
+        if ((x + y) % 2 == 0) { pixel(x, y, #3a5a7a) } else { pixel(x, y, #8aaaca) }
+      }
+    }
+  }
+}

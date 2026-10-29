@@ -1,0 +1,48 @@
+// __FEATURE__.ips — the __FEATURE__ of __NAME__, one of its characteristic
+// features. The root places this part's origin (its bottom centre) with `at`,
+// passes its size and colour, and stands the next feature on `top`.
+// Replace the drawing with the feature itself; keep the inputs and the
+// outputs the root relies on.
+
+import looks from "../materials.ips"
+
+asset __PART__ {
+  size __W__x__H__
+  origin __OX__, __OY__
+  input f32 half = 8.0
+  input f32 tall = 6.0
+  input color base = #8a8a8a
+  output point top                  // where the next feature stands
+
+  const distribution typical = gaussian(mean = 0.5, sigma = 0.18)
+  const f32 cx = __OX__.0
+  const f32 ground = __OY__.0
+
+  draw {
+    // A part takes a colour and builds its material from it: every tone
+    // follows that base.
+    look = looks.__MATERIAL__(base = base)
+    tones = stepper(look.shadow to look.light).pick(5)
+    bulge = 0.0 to 1.0 with typical
+
+    rows = max(int(tall), 1)
+    layer shape(alpha = surface.source_over) {
+      for r in 0..rows {
+        t = float(r) / float(max(rows - 1, 1))
+        w = half * (0.85 + 0.15 * sin(t * 3.1416) * bulge)
+        y = ground - float(rows) + float(r)
+        // Lit from the upper left: the left half and the top are lighter.
+        rect(cx - w, y, w, 1.0, tones[toneAt(0.95 - t * 0.5)])
+        rect(cx, y, w, 1.0, tones[toneAt(0.5 - t * 0.5)])
+      }
+    }
+    surface.paint(mask.expand(mask.from(shape), 1), look.edge, blend = surface.source_over)
+    surface.paint(shape, blend = surface.source_over)
+    top = {cx, ground - float(rows)}
+  }
+
+  // The tone at a lightness from 0 (shadow) to 1 (light).
+  toneAt(light: f32) -> i32 {
+    return int(clamp(light, 0.0, 1.0) * 4.0 + 0.5)
+  }
+}

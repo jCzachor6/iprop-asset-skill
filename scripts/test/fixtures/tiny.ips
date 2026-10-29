@@ -1,0 +1,9 @@
+// Lint fixture: a small drawing in a large canvas.
+asset Tiny {
+  size 64x64
+  draw {
+    rect(30, 52, 8, 8, #1c2630)
+    rect(31, 53, 6, 6, #6a7a8a)
+    rect(31, 53, 3, 3, #9aaaba)
+  }
+}

@@ -1,0 +1,118 @@
+// emblem.ips — a painted emblem on the shield's face: a heraldic division,
+// an ordinary or a figure around the boss, in one colour. Paints absolute
+// 48x48 coordinates (origin 0, 0). The root clips it to the paint on the
+// board and calls it four times with the same seed, in the base, shadow, light
+// and deep tone of one paint, so the emblem takes the board's light. Bands and
+// divisions run past the face; the clip trims them at the rim.
+// Designs: 1 cross, 2 saltire, 3 chevron, 4 per pale, 5 quarterly, 6 bend,
+// 7 fess, 8 ring, 9 gyronny, 10 sun rays, 11 lozenge, 12 chief, 13 pale.
+
+asset ShieldEmblem {
+  size 48x48
+  origin 0, 0
+  input u32 design = 1
+  input f32 cx = 24.0          // the boss centre
+  input f32 cy = 24.0
+  input f32 half = 14.0        // half-width of the face at its widest
+  input f32 top = 6.0          // the face's top and bottom rows
+  input f32 bottom = 42.0
+  input f32 bossR = 4.0        // how far the boss reaches, outline included
+  input color ink = #9a2a24
+
+  const f32 far = 60.0
+
+  draw {
+    // Every roll first, whatever the design, so the three passes match.
+    band = 0.0 to 1.0 with gaussian(mean = 0.5, sigma = 0.2)
+    reach = 0.0 to 1.0 with gaussian(mean = 0.5, sigma = 0.2)
+    flip = chance(0.5)
+    turn = chance(0.5)
+    spokes = pick(6, 8)
+    rays = pick(8, 12)
+
+    kind = clamp(int(design), 1, 13)
+    b = max(2, 2 * round(lerp(0.24, 0.36, band) * half * 0.5))   // an even band width
+    hb = float(b) * 0.5
+    tall = bottom - top
+    // A ring sits between the boss and the rim; where there is no room for
+    // it (a buckler with a big boss), the shield gets a cross instead.
+    inner = bossR + 1.5
+    outer = min(inner + max(2.0, hb) + lerp(0.0, 2.0, reach), half - 1.0)
+    if (kind == 8 && outer - inner < 2.0) { kind = 1 }
+    if (kind == 1) {
+      rect(cx - hb, 0.0, float(b), 48.0, ink)
+      rect(0.0, cy - hb, 48.0, float(b), ink)
+    } else if (kind == 2) {
+      diagonal(cx, cy, hb, 1.0, ink)
+      diagonal(cx, cy, hb, -1.0, ink)
+    } else if (kind == 3) {
+      apex = round(cy - bossR - lerp(3.0, 6.0, reach))   // above the boss
+      thick = float(b) * 1.4
+      poly(ink, cx, apex, cx + far, apex + far, cx + far, apex + far + thick,
+           cx, apex + thick, cx - far, apex + far + thick, cx - far, apex + far)
+    } else if (kind == 4) {
+      if (flip) { rect(0.0, 0.0, cx, 48.0, ink) } else { rect(cx, 0.0, 48.0 - cx, 48.0, ink) }
+    } else if (kind == 5) {
+      if (flip) {
+        rect(0.0, 0.0, cx, cy, ink)
+        rect(cx, cy, 48.0 - cx, 48.0 - cy, ink)
+      } else {
+        rect(cx, 0.0, 48.0 - cx, cy, ink)
+        rect(0.0, cy, cx, 48.0 - cy, ink)
+      }
+    } else if (kind == 6) {
+      s = 1.0
+      if (flip) { s = -1.0 }
+      diagonal(cx, cy, hb, s, ink)
+    } else if (kind == 7) {
+      rect(0.0, cy - hb, 48.0, float(b), ink)
+    } else if (kind == 8) {
+      ring(cx, cy, outer, inner, ink)
+    } else if (kind == 9) {
+      wedges(cx, cy, spokes, 0.5, turn, ink)
+    } else if (kind == 10) {
+      wedges(cx, cy, rays, 0.3, turn, ink)
+    } else if (kind == 11) {
+      hx = round(half * lerp(0.6, 0.8, reach))
+      hy = round(tall * lerp(0.36, 0.46, reach))
+      poly(ink, cx, cy - hy, cx + hx, cy, cx, cy + hy, cx - hx, cy)
+    } else if (kind == 12) {
+      rect(0.0, 0.0, 48.0, float(round(top + tall * lerp(0.26, 0.36, band))), ink)
+    } else {
+      rect(cx - hb, 0.0, float(b), 48.0, ink)
+    }
+  }
+
+  // A band through (px, py) along (1, s), hb pixels to each side of its line.
+  diagonal(px: f32, py: f32, hb: f32, s: f32, ink: color) {
+    d = hb * 1.41421
+    poly(ink, px - far, py - far * s - d, px + far, py + far * s - d,
+         px + far, py + far * s + d, px - far, py - far * s + d)
+  }
+
+  // An annulus about (px, py).
+  ring(px: f32, py: f32, outer: f32, inner: f32, ink: color) {
+    layer whole(alpha = surface.source_over) { oval(px, py, outer, outer, ink) }
+    layer hole(alpha = surface.source_over) { oval(px, py, inner, inner, ink) }
+    surface.paint(mask.subtract(mask.from(whole), mask.from(hole)), ink, blend = surface.source_over)
+  }
+
+  // Wedges around (px, py): every other one of `count` sectors (share 0.5,
+  // gyronny), or `count` narrow rays (a smaller share).
+  wedges(px: f32, py: f32, count: i32, share: f32, turn: i32, ink: color) {
+    step = 6.2831853 / float(count)
+    start = 0.0
+    if (turn) { start = step * 0.5 }
+    for k in 0..count {
+      a0 = start + float(k) * step
+      a1 = a0 + step
+      if (share < 0.45) {
+        a0 = start + float(k) * step - step * share * 0.5
+        a1 = a0 + step * share
+      }
+      if (share < 0.45 || k % 2 == 0) {
+        poly(ink, px, py, px + far * cos(a0), py + far * sin(a0), px + far * cos(a1), py + far * sin(a1))
+      }
+    }
+  }
+}

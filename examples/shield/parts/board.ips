@@ -1,0 +1,299 @@
+// board.ips — the shield's body: its silhouette, the wooden planks or metal
+// plate of the face, the field paint and its wear, and the rim with its studs.
+// Paints absolute 48x48 coordinates (origin 0, 0): the root places it at
+// {0, 0} and passes the rolled silhouette, build and colours.
+//
+// Shapes: 1 round, 2 heater, 3 kite, 4 buckler, 5 oval, 6 tower, 7 hex,
+// 8 waisted. Every row of a silhouette is one span, symmetric about x = 24,
+// so a family is a half-width profile (`spanAt`) and the body is rows of rect.
+// The light comes from the upper left: the face and the rim take their light
+// and shadow bands from offsets of their own masks, so every family is shaded
+// the same way.
+//
+// Outputs, in the caller's coordinates:
+//   boss    the centre of the boss (the hand grips behind it)
+//   room    x: the face's half-width at the boss row, to size the boss
+//   foot    the bottom of the outline on the centre line
+//   bounds  the silhouette with its outline
+//   face    mask: the field inside the rim
+//   paint   mask: the field where paint holds (the face less chips)
+//   lit     mask: the lit band of `paint`, for paint laid on top
+//   shade   mask: the shaded band of `paint`
+//   seams   mask: the plank seams under `paint`, painted in the paint's deep
+//           tone so they stay grooves
+
+import mats from "../materials.ips"
+
+asset ShieldBoard {
+  size 48x48
+  origin 0, 0
+  input u32 shape = 1            // 1 round .. 8 waisted
+  input f32 half = 16.0          // half-width at the widest row
+  input f32 tall = 32.0          // rows from top to bottom
+  input f32 bend = 0.5           // the family's own profile parameter, 0..1
+  input u32 body = 1             // 1 wooden planks, 2 metal plate
+  input u32 planks = 4
+  input u32 rimKind = 1          // 1 metal band, 2 rawhide, 3 rolled edge of the plate
+  input u32 rimWidth = 2
+  input u32 studs = 0            // 1: studs along a metal rim
+  input color wood = #8a6a44
+  input color metal = #8a929a
+  input color rim = #8a929a
+  input color field = #00000000  // transparent: a bare face
+  input f32 wear = 0.2           // 0 pristine .. 1 battered
+
+  output point boss
+  output point room
+  output point foot
+  output rect bounds
+  output mask face
+  output mask paint
+  output mask lit
+  output mask shade
+  output mask seams
+
+  const f32 cx = 24.0
+  const color solid = #ffffff
+  // Stream keys: hash(seed ^ key) seeds the planks' grain and the wear.
+  const i32 grainKey = 0x9e3779b9
+  const i32 wearKey = 0x2545f491
+
+  draw {
+    kind = clamp(int(shape), 1, 8)
+    // An even number of rows keeps every family symmetric about y = 24: an odd
+    // count leaves one middle row that rounds up and juts out a pixel.
+    rows = clamp(2 * round(tall * 0.5), 8, 42)
+    top = 24 - rows / 2
+    rw = clamp(int(rimWidth), 1, 3)
+    faceHalf = half - float(rw)
+
+    // ---- the silhouette: one span per row ---------------------------------
+    // Rows narrower than half a pixel stay empty, so a point ends in one
+    // two-pixel row; `lowest` is the last row painted.
+    widest = 1
+    lowest = top
+    layer silhouette(alpha = surface.source_over) {
+      for r in 0..rows {
+        w = spanAt(kind, (float(r) + 0.5) / float(rows), half, bend, float(rows))
+        if (w >= 1) {
+          widest = max(widest, w)
+          lowest = top + r
+          rect(cx - float(w), float(top + r), float(w * 2), 1.0, solid)
+        }
+      }
+    }
+    mask bodyM = mask.from(silhouette)
+    mask faceM = mask.shrink(bodyM, rw)
+    mask rimM = mask.subtract(bodyM, faceM)
+
+    // Light bands of the face: lit along the upper-left edge, shaded along
+    // the lower right, and the rim's cast shadow just inside the upper left.
+    mask cast = mask.subtract(faceM, mask.offset(faceM, 1, 1))
+    mask litZone = mask.subtract(mask.subtract(faceM, mask.offset(faceM, 3, 3)), cast)
+    mask shadeZone = mask.union(mask.subtract(faceM, mask.offset(faceM, -3, -3)), cast)
+
+    // ---- tones ----------------------------------------------------------------
+    wd = mats.Wood(base = wood)
+    mt = mats.Metal(base = metal)
+    tones = [wd.deep, wd.shadow, wd.base, wd.light, wd.shine]
+    if (body == 2) { tones = [mt.deep, mt.shadow, mt.base, mt.light, mt.shine] }
+    band = mats.Metal(base = rim)
+    hide = mats.Hide(base = rim)
+    rimTones = [band.deep, band.shadow, band.base, band.light, band.shine]
+    edge = band.edge
+    if (rimKind == 2) {
+      rimTones = [hide.deep, hide.shadow, hide.base, hide.light, hide.shine]
+      edge = hide.edge
+    }
+
+    // ---- outline and face -----------------------------------------------------
+    surface.paint(mask.expand(bodyM, 1), edge, blend = surface.source_over)
+    surface.paint(faceM, tones[2], blend = surface.source_over)
+    surface.paint(shadeZone, tones[1], blend = surface.source_over)
+    surface.paint(litZone, tones[3], blend = surface.source_over)
+
+    // Planks: seams and grain. Rolled whatever the body, so the wear after
+    // them keeps its place.
+    n = clamp(int(planks), 2, 7)
+    pw = faceHalf * 2.0 / float(n)
+    stream_push(hash(seed ^ grainKey))
+    layer seamLines(alpha = surface.source_over) {
+      for k in 1..n {
+        sx = round(cx - faceHalf + pw * float(k) + (-0.7 to 0.7))
+        if (body == 1) { rect(float(sx), 0.0, 1.0, 48.0, solid) }
+      }
+    }
+    layer grain(alpha = surface.source_over) {
+      for k in 0..n {
+        for g in 0..3 {
+          gx = round(cx - faceHalf + pw * (float(k) + 0.25 + 0.5 * (0.0 to 1.0)))
+          gy = round(float(top) + float(rows) * (0.1 to 0.9))
+          len = 2 to 4
+          if (body == 1) { rect(float(gx), float(gy), 1.0, float(len), solid) }
+        }
+      }
+    }
+    stream_pop()
+    mask seamM = mask.intersect(mask.from(seamLines), faceM)
+    surface.paint(mask.intersect(mask.from(grain), faceM), tones[1], blend = surface.source_over)
+
+    // A polished plate reflects along one diagonal: a broad gleam with a
+    // bright core on the upper left, a thin one beside it, and a dark band
+    // across the lower right. `x + y = d` is a line of that diagonal.
+    if (body == 2) {
+      gleam = cx - faceHalf * 0.45 + float(top) + float(rows) * 0.28
+      dark = 48.0 + lerp(5.0, 8.0, bend)
+      clip(mask.subtract(faceM, cast)) {
+        line(dark + 10.0, -10.0, dark - 58.0, 58.0, 3, tones[1])
+        line(gleam + 10.0, -10.0, gleam - 58.0, 58.0, 3, tones[3])
+        line(gleam + 9.0, -10.0, gleam - 59.0, 58.0, 1, tones[4])
+        line(gleam + 15.0, -10.0, gleam - 53.0, 58.0, 1, tones[3])
+      }
+    }
+
+    // ---- wear: chips where the paint has come off, mostly near the rim --------
+    stream_push(hash(seed ^ wearKey))
+    count = int(wear * 14.0)
+    layer chips(alpha = surface.source_over) {
+      for i in 0..14 {
+        side = pick(-1.0, 1.0)
+        y = float(top) + float(rows) * (0.08 to 0.92)
+        inward = 0.0 to 5.0 with beta(alpha = 1.2, beta = 3.0, min = 0.0, max = 5.0)
+        rx = 0.8 to 2.0
+        ry = 0.6 to 1.4
+        if (i < count) {
+          w = spanAt(kind, (y - float(top)) / float(rows), half, bend, float(rows))
+          oval(cx + side * (float(w - rw) - 0.5 - inward), y, rx, ry, solid)
+        }
+      }
+    }
+    stream_pop()
+    mask paintM = mask.subtract(faceM, mask.from(chips))
+    mask groove = mask.intersect(seamM, paintM)
+
+    // ---- the field: paint over the boards, shaded like them; the seams stay
+    // grooves, in the paint's own deep tone where the paint holds ------------
+    surface.paint(seamM, tones[0], blend = surface.source_over)
+    if (field.a != 0) {
+      fp = mats.Paint(base = color.set.a(field, 255))
+      surface.paint(paintM, fp.base, blend = surface.source_over)
+      surface.paint(mask.intersect(paintM, shadeZone), fp.shadow, blend = surface.source_over)
+      surface.paint(mask.intersect(paintM, litZone), fp.light, blend = surface.source_over)
+      surface.paint(groove, fp.deep, blend = surface.source_over)
+    }
+
+    // ---- the rim: lit on the upper left, dark on the lower right, a glint ----
+    surface.paint(rimM, rimTones[2], blend = surface.source_over)
+    surface.paint(mask.intersect(rimM, mask.subtract(bodyM, mask.offset(bodyM, -2, -2))), rimTones[1], blend = surface.source_over)
+    mask rimLit = mask.intersect(rimM, mask.subtract(bodyM, mask.offset(bodyM, 2, 2)))
+    surface.paint(rimLit, rimTones[3], blend = surface.source_over)
+    layer glintArea(alpha = surface.source_over) {
+      oval(cx - half * 0.62, float(top) + float(rows) * 0.2, half * 0.5, float(rows) * 0.2, solid)
+    }
+    mask outerLit = mask.intersect(rimLit, mask.subtract(bodyM, mask.offset(bodyM, 1, 1)))
+    surface.paint(mask.intersect(outerLit, mask.from(glintArea)), rimTones[4], blend = surface.source_over)
+
+    // Studs along the middle of a metal rim, walked down the right half of the
+    // outline and mirrored, one every `step` pixels.
+    if (studs == 1 && rimKind != 2) {
+      clip(rimM) {
+        step = 6.0
+        next = 3.0
+        walked = 0.0
+        ax = 0.0
+        ay = float(top) + float(rw) * 0.5
+        last = rows - rw
+        for r in rw..(last + 1) {
+          bx = 0.0
+          by = float(top + rows) - float(rw) * 0.5
+          if (r < last) {
+            w = spanAt(kind, (float(r) + 0.5) / float(rows), half, bend, float(rows))
+            bx = float(max(w, 1)) - float(rw) * 0.5
+            by = float(top + r) + 0.5
+          }
+          seg = sqrt((bx - ax) * (bx - ax) + (by - ay) * (by - ay))
+          while (seg > 0.0 && next <= walked + seg) {
+            t = (next - walked) / seg
+            stud(cx + ax + (bx - ax) * t, ay + (by - ay) * t, rimTones)
+            next = next + step
+          }
+          walked = walked + seg
+          ax = bx
+          ay = by
+        }
+      }
+    }
+
+    // ---- what the root fits to the board --------------------------------------
+    bt = 0.5
+    if (kind == 2) { bt = 0.4 }
+    if (kind == 3) { bt = lerp(0.22, 0.32, bend) + 0.08 }
+    br = round(bt * float(rows))
+    boss = {cx, float(top + br)}
+    room = {float(spanAt(kind, float(br) / float(rows), half, bend, float(rows)) - rw), 0.0}
+    foot = {cx, float(lowest + 2)}
+    bounds = {cx - float(widest + 1), float(top - 1), float(widest * 2 + 2), float(lowest - top + 3)}
+    face = faceM
+    paint = paintM
+    lit = mask.intersect(paintM, litZone)
+    shade = mask.intersect(paintM, shadeZone)
+    seams = groove
+  }
+
+  // Half-width of a silhouette at height t (0 top, 1 bottom), in whole pixels.
+  spanAt(kind: i32, t: f32, w: f32, bend: f32, rows: f32) -> i32 {
+    // round, buckler and oval: an ellipse
+    hw = w * sqrt(max(0.0, 1.0 - (2.0 * t - 1.0) * (2.0 * t - 1.0)))
+    if (kind == 2) {
+      // heater: straight sides down to the shoulder, then curving to a point
+      s = lerp(0.3, 0.5, bend)
+      hw = w
+      if (t > s) {
+        u = (t - s) / (1.0 - s)
+        hw = w * (1.0 - u * u)
+      }
+      y = t * rows
+      if (y < 1.0) { hw = w - 1.5 } else if (y < 2.0) { hw = w - 0.5 }
+    } else if (kind == 3) {
+      // kite: a rounded head, then a long taper to the point
+      tw = lerp(0.22, 0.32, bend)
+      if (t < tw) {
+        v = (tw - t) / tw
+        hw = w * sqrt(max(0.0, 1.0 - v * v))
+      } else {
+        u = (t - tw) / (1.0 - tw)
+        hw = w * (1.0 - pow(u, 1.35))
+      }
+    } else if (kind == 6) {
+      // tower: a tall board with rounded corners
+      rc = lerp(2.0, 6.0, bend)
+      d = min(t * rows, (1.0 - t) * rows)
+      hw = w
+      if (d < rc) { hw = w - rc + sqrt(max(0.0, rc * rc - (rc - d) * (rc - d))) }
+    } else if (kind == 7) {
+      // hex: flat ends, angled shoulders, straight sides
+      a = lerp(0.16, 0.3, bend)
+      hw = w
+      if (t < a) { hw = lerp(w * 0.45, w, t / a) }
+      if (t > 1.0 - a) { hw = lerp(w, w * 0.45, (t - (1.0 - a)) / a) }
+    } else if (kind == 8) {
+      // waisted: two lobes pinched at the middle
+      r = lerp(0.27, 0.31, bend)
+      v1 = (t - r) / r
+      v2 = (t - (1.0 - r)) / r
+      hw = w * max(sqrt(max(0.0, 1.0 - v1 * v1)), sqrt(max(0.0, 1.0 - v2 * v2)))
+    }
+    return round(hw)
+  }
+
+  // A stud at (x, y) and its mirror across the centre line, each a bright
+  // head with its shadow below and to the right.
+  stud(x: f32, y: f32, tones: list<color>) {
+    c = int(x)
+    row = int(y)
+    pixel(c, row, tones[4])
+    pixel(c + 1, row + 1, tones[0])
+    pixel(47 - c, row, tones[4])
+    pixel(48 - c, row + 1, tones[0])
+  }
+}

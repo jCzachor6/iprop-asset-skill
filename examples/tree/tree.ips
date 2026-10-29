@@ -1,0 +1,625 @@
+import wood from "materials.ips";
+
+// A wild tree in the reference's small-pixel style: a dark trunk of bark
+// strands twisting round it, flared into roots at the ground, limbs that
+// wander up and out and thin to one-pixel twigs, and round clumps of small
+// leaves lit from the upper left. Every seed grows a different tree: the silhouette (gnarled,
+// broad, windswept, slender or umbrella), the trunk's height, girth, lean
+// and twist, how it forks, where the limbs and twigs go, how many clumps
+// it carries and how big, and the colours of its bark and leaves. Every
+// colour is drawn from a gradient: most trees are in some summer green,
+// others in spring lime, blue-green, olive, autumn (anywhere from gold to
+// red) or, rarely, copper, and a few are in blossom. Each clump drifts a
+// little cooler or warmer than the rest of its tree.
+//
+// The tree's shape is drawn from one stream of its own and walked five
+// times, once per pass: the wood's outline, its body, its bark strands,
+// the leaf clumps and the leaves on bare twigs. Every walk makes the same
+// draws, so the passes line up, and painting each tone over the whole
+// tree keeps the joints between limbs clean.
+//
+// Variety: extreme (every silhouette differs; the colours come in seasonal families)
+asset Tree {
+  size 128x128
+  origin 64, 124
+  input u32 kind = 0              // 0 rolls; 1 gnarled, 2 broad, 3 windswept, 4 slender, 5 umbrella
+  input color leaf = #00000000    // leaf colour; transparent rolls one
+  output point anchor
+  output rect collider
+  output list circle crown        // one circle per leaf clump
+
+  const distribution typical = gaussian(mean = 0.5, sigma = 0.18)
+  const distribution kinds = weighted {1: 30, 2: 20, 3: 18, 4: 14, 5: 18}
+  // 1 is the material's summer green; then spring lime, blue-green, olive,
+  // autumn from gold to red, copper and blossom.
+  const distribution seasons = weighted {1: 44, 2: 12, 3: 9, 4: 8, 5: 15, 6: 4, 7: 8}
+  palette foliage = [#82ac3e to #bccc5c, #2c5a4a to #5e8e72, #6a7234 to #9e9c54, #dcb444 to #9a3022, #4c2630 to #7e4c4e]
+  // The petals of a tree in blossom, on its lit leaves: pink to near white.
+  palette petals = [#e284a8 to #fce6ee]
+  // 1 is the material's brown; then grey, red-brown, pale ash and near black.
+  const distribution barkKinds = weighted {1: 52, 2: 14, 3: 14, 4: 10, 5: 10}
+  palette barks = [#45403e to #6c6660, #5a3226 to #7e4e38, #7a7268 to #aca496, #282220 to #3e3430]
+
+  // Stream keys, one per purpose: hash(seed ^ key) seeds that purpose's
+  // stream. Keep them fixed once a game stores seeds.
+  const i32 kindKey = 0x2f6b9a13
+  const i32 shapeKey = 0x51ed2701
+  const i32 colorKey = 0x6c656166   // "leaf" in ASCII
+  const i32 kinkKey = 0x6b696e6b    // "kink": the trunk's bends, from the shape's seed
+
+  // The passes, in painting order.
+  const i32 WOOD_DARK = 0
+  const i32 WOOD_BODY = 1
+  const i32 WOOD_LIGHT = 2
+  const i32 LEAVES = 3
+  const i32 SPRIGS = 4
+
+  // What a silhouette hands down to its limbs, branches and twigs.
+  const i32 CURL = 0          // how much each piece of wood turns at random, radians
+  const i32 PULL = 1          // how fast wood turns back towards its up
+  const i32 WIND = 2          // the tilt of that up, radians; negative leans left
+  const i32 BRANCHES = 3      // branches along a limb
+  const i32 BRANCH_LEN = 4    // a branch's length, as a share of its limb's
+  const i32 TWIGS = 5         // twigs at a bare branch's end
+  const i32 LIMB_CLUMP = 6    // chance of a clump at a side limb's end
+  const i32 BRANCH_CLUMP = 7  // chance of a clump at a branch's end
+  const i32 CLUMP = 8         // a limb clump's radius, px
+  const i32 FLAT = 9          // a clump's height as a share of its width
+  const i32 SPRIG = 10        // chance of leaves on a bare twig's tip
+  const i32 FAN = 11          // the widest angle a branch leaves its limb at
+  const i32 SPUR = 12         // chance of a short twig at a joint of a limb or branch
+  const i32 JOINT = 13        // chance of a small clump at a joint of a limb
+
+  draw {
+    // The silhouette, the colours and the shape are hashed from the seed
+    // before anything draws, so a rolled kind renders exactly like the same
+    // kind chosen explicitly.
+    shape = hash(seed ^ shapeKey)
+    look = clamp(kind, 0, 5)
+    if (look == 0) {
+      stream_push(hash(seed ^ kindKey))
+      look = 1 to 5 with kinds
+      stream_pop()
+    }
+    stream_push(hash(seed ^ colorKey))
+    bark = wood.Bark()
+    leaves = wood.Leaves()
+    barkKind = 1 to 5 with barkKinds
+    barkTint = barks[clamp(barkKind - 2, 0, 3)].pick()
+    season = 1 to 7 with seasons
+    hue = foliage[clamp(season - 2, 0, 4)].pick()
+    petal = petals[0].pick()
+    stream_pop()
+    if (barkKind > 1) { bark = wood.Bark(base = barkTint) }
+    if (season >= 2 && season <= 6) { leaves = wood.Leaves(base = hue) }
+    // In blossom the lit leaves are petals; the shaded ones stay green.
+    if (season == 7) { leaves = wood.Leaves(light = petal, glint = color.mix(petal, #ffffff, 0.6)) }
+    if (leaf.a > 0) { leaves = wood.Leaves(base = color.set.a(leaf, 255)) }
+
+    // The ground cuts the trunk and its roots off flat, along the outline's
+    // dark edge.
+    layer ground(alpha = surface.legacy) { rect(0, 0, 128, 124, #ffffff) }
+    soil = mask.from(ground)
+    clip(soil) { grow(WOOD_DARK, look, shape, bark, leaves) }
+    clip(mask.offset(soil, 0, -1)) {
+      grow(WOOD_BODY, look, shape, bark, leaves)
+      grow(WOOD_LIGHT, look, shape, bark, leaves)
+    }
+    grow(LEAVES, look, shape, bark, leaves)
+    grow(SPRIGS, look, shape, bark, leaves)
+  }
+
+  // One walk over the whole tree, painting the tone of `mode`.
+  grow(mode: i32, look: i32, s: i32, b: wood.Bark, f: wood.Leaves) {
+    stream_push(s)
+    // Every roll is made up front, whatever the silhouette.
+    size = 0.0 to 1.0 with typical
+    girth = 0.0 to 1.0 with typical
+    leanRoll = 0.0 to 1.0
+    bendRoll = 0.0 to 1.0
+    forkRoll = 0.0 to 1.0
+    spreadRoll = 0.0 to 1.0 with typical
+    side = pick(-1.0, 1.0)
+    phase = 0.0 to 6.2832
+    twist = 0.0 to 6.2832
+    shift = -4.0 to 4.0
+
+    // The silhouette sets the trunk, how it forks and what its limbs carry.
+    trunkH = 36.0
+    baseW = 8.0
+    topW = 4.0
+    lean = 0.0
+    bend = 0.3
+    waves = 1.5
+    forks = 2
+    spread = 1.2
+    sides = 1
+    sideLo = 0.45
+    sideHi = 0.85
+    limbLen = 30.0
+    curl = 0.3
+    pull = 0.12
+    wind = 0.0
+    branches = 2
+    branchLen = 0.55
+    twigs = 1
+    limbClump = 0.85
+    branchClump = 0.15
+    clumpR = 8.5
+    flat = 0.85
+    sprig = 0.9
+    fan = 0.9
+    spur = 0.35
+    joint = 0.25
+    if (look == 1) {
+      // Gnarled: an S-bent trunk forking low into two or three limbs, each
+      // ending in one big clump, with bare twigs between them.
+      trunkH = lerp(40.0, 56.0, size)
+      baseW = lerp(10.0, 14.0, girth)
+      topW = baseW * 0.48
+      lean = side * lerp(0.05, 0.35, leanRoll)
+      bend = lerp(0.25, 0.5, bendRoll)
+      waves = 1.6
+      forks = 2 + (forkRoll > 0.65)
+      spread = lerp(1.0, 1.5, spreadRoll)
+      sides = 1 + (forkRoll < 0.3)
+      limbLen = lerp(36.0, 50.0, size)
+      limbClump = 0.9
+      branchClump = 0.45
+      clumpR = lerp(13.0, 17.5, size)
+      spur = 0.65
+    } else if (look == 2) {
+      // Broad: a short, thick trunk under many spreading limbs, every one
+      // of them leafy, the clumps heaped into one wide crown.
+      trunkH = lerp(28.0, 40.0, size)
+      baseW = lerp(13.0, 18.0, girth)
+      topW = baseW * 0.55
+      lean = side * lerp(0.0, 0.12, leanRoll)
+      bend = lerp(0.08, 0.2, bendRoll)
+      waves = 1.0
+      forks = 3 + (forkRoll > 0.5)
+      spread = lerp(1.7, 2.3, spreadRoll)
+      sides = 1 + (forkRoll > 0.7)
+      sideLo = 0.5
+      sideHi = 0.9
+      limbLen = lerp(38.0, 52.0, size)
+      curl = 0.25
+      pull = 0.1
+      branches = 3
+      branchLen = 0.5
+      limbClump = 1.0
+      branchClump = 0.5
+      clumpR = lerp(14.0, 18.0, size)
+      flat = 0.8
+      sprig = 0.85
+      fan = 0.8
+      joint = 0.35
+    } else if (look == 3) {
+      // Windswept: a leaning trunk, every limb blown to one side and the
+      // clumps flattened in the wind.
+      trunkH = lerp(40.0, 58.0, size)
+      baseW = lerp(9.0, 13.0, girth)
+      topW = baseW * 0.45
+      lean = side * lerp(0.45, 0.7, leanRoll)
+      bend = lerp(0.15, 0.3, bendRoll)
+      waves = 0.9
+      forks = 2
+      spread = lerp(0.6, 0.9, spreadRoll)
+      sides = 2 + (forkRoll > 0.5)
+      sideLo = 0.35
+      sideHi = 0.9
+      limbLen = lerp(34.0, 48.0, size)
+      pull = 0.25
+      wind = side * lerp(0.6, 0.9, leanRoll)
+      twigs = 2
+      limbClump = 0.9
+      branchClump = 0.6
+      clumpR = lerp(11.0, 15.5, size)
+      flat = 0.62
+      sprig = 0.95
+      fan = 0.7
+      spur = 0.5
+      joint = 0.35
+    } else if (look == 4) {
+      // Slender: a tall, thin trunk with short limbs all the way up and
+      // small clumps among many leafy twigs.
+      trunkH = lerp(66.0, 88.0, size)
+      baseW = lerp(6.0, 8.0, girth)
+      topW = 3.0
+      lean = side * lerp(0.0, 0.2, leanRoll)
+      bend = lerp(0.08, 0.25, bendRoll)
+      waves = 1.3
+      forks = 1 + (forkRoll > 0.5)
+      spread = 0.6
+      sides = 4 + int(forkRoll * 4.0)
+      sideLo = 0.3
+      sideHi = 0.95
+      limbLen = lerp(20.0, 30.0, size)
+      curl = 0.35
+      pull = 0.2
+      wind = lean * 0.4
+      branches = 1
+      branchLen = 0.6
+      twigs = 2
+      limbClump = 0.85
+      branchClump = 0.65
+      clumpR = lerp(9.5, 13.0, size)
+      joint = 0.4
+      flat = 0.9
+      sprig = 1.0
+      fan = 0.8
+    } else {
+      // Umbrella: limbs spreading almost flat from the top of the trunk
+      // under wide, flat clumps.
+      trunkH = lerp(36.0, 52.0, size)
+      baseW = lerp(9.0, 12.0, girth)
+      topW = baseW * 0.55
+      lean = side * lerp(0.05, 0.3, leanRoll)
+      bend = lerp(0.2, 0.4, bendRoll)
+      waves = 1.2
+      forks = 3 + (forkRoll > 0.6)
+      spread = lerp(2.0, 2.6, spreadRoll)
+      sides = forkRoll > 0.7
+      sideLo = 0.6
+      sideHi = 0.9
+      limbLen = lerp(38.0, 50.0, size)
+      curl = 0.2
+      pull = 0.08
+      branches = 3
+      branchLen = 0.45
+      limbClump = 1.0
+      branchClump = 0.8
+      clumpR = lerp(14.0, 18.0, size)
+      flat = 0.55
+      sprig = 0.85
+      fan = 0.6
+      joint = 0.3
+    }
+    shape = [curl, pull, wind, float(branches), branchLen, float(twigs), limbClump, branchClump, clumpR, flat, sprig, fan, spur, joint]
+
+    // The trunk bends the same way on every walk, so its top is known
+    // before it is drawn: the base is set to keep the crown on the canvas.
+    steps = max(5, int(trunkH / 3.0))
+    segLen = trunkH / float(steps)
+    kink = hash(s ^ kinkKey)
+    topDx = 0.0
+    for i in 0..steps {
+      topDx = topDx + cos(trunkAngle(float(i + 1) / float(steps), lean, bend, waves, phase, kink)) * segLen
+    }
+    x0 = 64.0 - topDx * 0.7 - wind * 16.0 + shift
+    if (mode == WOOD_DARK) {
+      anchor = {x0, 124.0}
+      collider = {x0 - baseW * 0.5, 120.0, baseW, 4.0}
+    }
+
+    // Roots: two spreading along the ground from the trunk's sides, so the
+    // base flares out into them, and sometimes a third heading down in
+    // front.
+    p = {x0, 124.0}
+    roots = 2 + (0 to 1)
+    for k in 0..roots {
+      rs = float(k % 2) * 2.0 - 1.0
+      ra = 1.5708 - rs * (1.33 to 1.5)
+      if (k == 2) { ra = 1.5708 - rs * (0.5 to 0.8) }
+      root = p + {rs * baseW * (0.28 to 0.38), -2.0}
+      tube(mode, root, root + {cos(ra), sin(ra)} * (baseW * (0.7 to 1.1)), baseW * 0.62, 1.2, twist, b)
+    }
+
+    // The trunk: an S-bend about its lean, narrowing from the roots up.
+    // Limbs sprout from its upper part.
+    sideChance = float(sides) / max(float(steps) * (sideHi - sideLo), 1.0)
+    a = -1.5708
+    dist = 0.0
+    for i in 0..steps {
+      t0 = float(i) / float(steps)
+      t1 = float(i + 1) / float(steps)
+      a = trunkAngle(t1, lean, bend, waves, phase, kink)
+      q = p + {cos(a), sin(a)} * segLen
+      tube(mode, p, q, trunkWidth(t0, baseW, topW, phase), trunkWidth(t1, baseW, topW, phase), twist + dist * 0.18, b)
+      dist = dist + segLen
+      knotted = chance(0.12)
+      if (knotted && t1 > 0.2 && t1 < 0.8 && mode == WOOD_LIGHT) { knot(q, a, trunkWidth(t1, baseW, topW, phase), b) }
+      sprout = chance(sideChance)
+      if (sprout && t1 >= sideLo && t1 <= sideHi) {
+        sa = a + pick(-1.0, 1.0) * (0.75 to 1.25)
+        limb(mode, q, sa, trunkWidth(t1, baseW, topW, phase) * (0.45 to 0.6), limbLen * (0.45 to 0.75), limbClump, shape, b, f)
+      }
+      p = q
+    }
+
+    // The crown: the trunk splits into its limbs, fanned about a direction
+    // halfway between the trunk's and straight up. They are the likeliest
+    // limbs to end in leaves.
+    up = lerp(a, -1.5708, 0.4)
+    for k in 0..forks {
+      off = 0.0
+      if (forks > 1) { off = (float(k) / float(forks - 1) - 0.5) * spread }
+      limb(mode, p, up + off + (-0.15 to 0.15), topW * (0.7 to 0.9), limbLen * (0.85 to 1.15), min(1.0, limbClump + 0.15), shape, b, f)
+    }
+    stream_pop()
+  }
+
+  // The trunk's direction at height t, 0 at the ground and 1 where it
+  // forks: upright at the base, then bending about its lean, with small
+  // kinks from a noise of its own.
+  trunkAngle(t: f32, lean: f32, bend: f32, waves: f32, phase: f32, kink: i32) -> f32 {
+    return -1.5708 + lean * t + bend * (sin(t * waves * 3.1416 + phase) - sin(phase)) + 0.32 * (noise(t * 4.0, 0.5, kink) - 0.5)
+  }
+
+  // The trunk's width at height t, 0 at the ground and 1 where it forks:
+  // it narrows from the base to the top, swells and narrows a little on
+  // the way, and flares into the roots.
+  trunkWidth(t: f32, base: f32, top: f32, phase: f32) -> f32 {
+    flare = max(0.0, 1.0 - t / 0.12)
+    return lerp(base, top, pow(t, 0.75)) * (1.0 + 0.08 * sin(t * 17.0 + phase)) + base * 0.3 * flare * flare
+  }
+
+  // A knot in the bark: a dark hollow under a lit lip, on the trunk's lit
+  // half.
+  knot(p: vec2, a: f32, w: f32, m: wood.Bark) {
+    side = {sin(a), 0.0 - cos(a)}
+    if (vec2.dot(side, {-0.6, -0.8}) < 0.0) { side = -side }
+    k = p + side * (w * 0.15)
+    oval(k + {0.0, -0.8}, 1.6, 1.1, m.light)
+    oval(k, 1.3, 0.9, m.deep)
+  }
+
+  // A limb: a thick branch that winds up and out, thinning as it goes, with
+  // branches off its joints and, with chance `leafChance`, a clump at its
+  // end (otherwise a pair of bare twigs).
+  limb(mode: i32, start: vec2, a0: f32, w0: f32, len: f32, leafChance: f32, sh: list<f32>, b: wood.Bark, f: wood.Leaves) {
+    segs = clamp(int(len / 6.0), 3, 6) + (0 to 1)
+    step = len / float(segs)
+    up = -1.5708 + sh[WIND]
+    twist = 0.0 to 6.2832
+    p = start
+    a = a0
+    w = w0
+    for i in 0..segs {
+      a = steer(a + (up - a) * sh[PULL] + (-sh[CURL] to sh[CURL]), p, sh[CLUMP])
+      q = inside(p + {cos(a), sin(a)} * step)
+      w1 = lerp(w0, 1.3, float(i + 1) / float(segs))
+      tube(mode, p, q, w, w1, twist + float(i) * step * 0.18, b)
+      if (i < segs - 1 && chance(sh[BRANCHES] / float(segs - 1))) {
+        ba = a + pick(-1.0, 1.0) * (0.45 to sh[FAN])
+        branch(mode, q, ba, min(w1 * 0.6, 2.2), len * sh[BRANCH_LEN] * (0.6 to 1.0), sh, b, f)
+      } else if (chance(sh[SPUR])) {
+        twig(mode, q, a + pick(-1.0, 1.0) * (0.6 to 1.2), 3.0 to 6.0, sh, b, f)
+      }
+      // A small clump beside the joint, past the limb's first one.
+      tuft = chance(sh[JOINT])
+      tr = sh[CLUMP] * (0.42 to 0.58)
+      ta = a + pick(-1.0, 1.0) * (0.4 to 0.9)
+      ts = 0 to 1000000000
+      if (tuft && i > 0 && mode == LEAVES) { clump(q + {cos(ta), sin(ta)} * (tr * 0.8), tr, sh[FLAT], f, ts) }
+      p = q
+      w = w1
+    }
+    leafy = chance(leafChance)
+    r = sh[CLUMP] * (0.85 to 1.15)
+    cs = 0 to 1000000000
+    if (leafy) {
+      if (mode == LEAVES) { clump(p + {cos(a), sin(a)} * (r * 0.3), r, sh[FLAT], f, cs) }
+    } else {
+      twig(mode, p, a - (0.25 to 0.6), 6.0 to 10.0, sh, b, f)
+      twig(mode, p, a + (0.25 to 0.6), 6.0 to 10.0, sh, b, f)
+    }
+  }
+
+  // A branch: thin wood that zigzags off a limb, with twigs off its
+  // joints and a small clump or a few bare twigs at its end.
+  branch(mode: i32, start: vec2, a0: f32, w0: f32, len: f32, sh: list<f32>, b: wood.Bark, f: wood.Leaves) {
+    segs = clamp(int(len / 5.0), 2, 4)
+    step = len / float(segs)
+    up = -1.5708 + sh[WIND]
+    p = start
+    a = a0
+    w = w0
+    for i in 0..segs {
+      a = steer(a + (up - a) * sh[PULL] * 0.7 + (-sh[CURL] * 1.3 to sh[CURL] * 1.3), p, sh[CLUMP] * 0.6)
+      q = inside(p + {cos(a), sin(a)} * step)
+      w1 = lerp(w0, 1.0, float(i + 1) / float(segs))
+      tube(mode, p, q, w, w1, 0.0, b)
+      if (i < segs - 1 && chance(sh[SPUR])) {
+        twig(mode, q, a + pick(-1.0, 1.0) * (0.5 to 1.0), 4.0 to 7.0, sh, b, f)
+      }
+      p = q
+      w = w1
+    }
+    leafy = chance(sh[BRANCH_CLUMP])
+    r = sh[CLUMP] * (0.5 to 0.7)
+    cs = 0 to 1000000000
+    if (leafy) {
+      if (mode == LEAVES) { clump(p + {cos(a), sin(a)} * (r * 0.3), r, sh[FLAT], f, cs) }
+    } else {
+      for k in 0..int(sh[TWIGS]) { twig(mode, p, a + (-0.7 to 0.7), 4.0 to 8.0, sh, b, f) }
+    }
+  }
+
+  // A twig: one or two one-pixel strokes, often leafy at the tip.
+  twig(mode: i32, start: vec2, a0: f32, len: f32, sh: list<f32>, b: wood.Bark, f: wood.Leaves) {
+    segs = 1 to 2
+    step = len / float(segs)
+    p = start
+    a = a0
+    for i in 0..segs {
+      a = a + (-0.45 to 0.45)
+      q = inside(p + {cos(a), sin(a)} * step)
+      tube(mode, p, q, 1.0, 1.0, 0.0, b)
+      p = q
+    }
+    leafy = chance(sh[SPRIG])
+    hs = 0 to 1000000000
+    if (leafy && mode == SPRIGS) { sprig(p, a, f, hs) }
+  }
+
+  // Turns wood that heads off the canvas back over it: in from the sides,
+  // and level below the top, leaving room for a clump of radius r.
+  steer(a: f32, p: vec2, r: f32) -> f32 {
+    out = a
+    if (p.x > 124.0 - r * 1.4 && cos(a) > 0.0) { out = a + (-2.2 - a) * 0.45 }
+    if (p.x < 4.0 + r * 1.4 && cos(a) < 0.0) { out = a + (-0.95 - a) * 0.45 }
+    if (p.y < 6.0 + r * 1.6 && sin(a) < -0.3) {
+      level = -0.35
+      if (cos(out) < 0.0) { level = -2.79 }
+      out = out + (level - out) * 0.5
+    }
+    return out
+  }
+
+  // Keeps wood on the canvas.
+  inside(q: vec2) -> vec2 {
+    return {clamp(q.x, 3.0, 124.0), clamp(q.y, 3.0, 120.0)}
+  }
+
+  // One length of wood from a to b, wa and wb wide at its ends, in the
+  // tone of this pass: the dark outline, then the body shifted towards the
+  // light, then the strands of bark twisting round it. Wood under 2.6 px
+  // is a crisp twig line, painted with the outline.
+  tube(mode: i32, a: vec2, b: vec2, wa: f32, wb: f32, twist: f32, m: wood.Bark) {
+    d = b - a
+    len = vec2.len(d)
+    if (len < 0.05) { return; }
+    dir = d / len
+    lit = {dir.y, 0.0 - dir.x}
+    if (vec2.dot(lit, {-0.6, -0.8}) < 0.0) { lit = -lit }
+    thick = max(wa, wb)
+    if (thick < 2.6) {
+      if (mode == WOOD_DARK) {
+        th = 1
+        if (thick >= 1.8) { th = 2 }
+        line(a, b, th, m.twig)
+      }
+      return;
+    }
+    steps = int(len * 2.0) + 1
+    for j in 0..steps + 1 {
+      u = float(j) / float(steps)
+      c = lerp(a, b, u)
+      r = lerp(wa, wb, u) * 0.5
+      if (mode == WOOD_DARK) {
+        oval(c, r, r, m.deep)
+      } else if (mode == WOOD_BODY && r > 1.4) {
+        rb = r * 0.85 - 1.0
+        oval(c + lit * (r * 0.15), rb, rb, m.base)
+      } else if (mode == WOOD_LIGHT && r > 1.9) {
+        // The strands run round the wood in a slow helix. Only the front
+        // of each turn shows: lit on the side towards the light, half lit
+        // in the middle, and a dark groove after each strand.
+        rl = max(0.6, r * 0.16)
+        reach = r - 1.0 - rl
+        strands = 2 + int(r / 3.0)
+        for k in 0..strands {
+          turn = twist + u * len * 0.18 + float(k) * 6.2832 / float(strands)
+          if (cos(turn) > 0.0) {
+            across = sin(turn)
+            if (across > 0.2) {
+              oval(c + lit * (reach * across), rl, rl, m.light)
+            } else if (across > -0.35) {
+              oval(c + lit * (reach * across), rl * 0.85, rl * 0.85, m.sheen)
+            }
+          }
+          groove = turn + 3.1416 / float(strands)
+          if (cos(groove) > 0.25) { oval(c + lit * (reach * sin(groove)), 0.55, 0.55, m.deep) }
+        }
+      }
+    }
+  }
+
+  // One clump of leaves: a big core at the back and a few smaller puffs
+  // heaped in front of it, each painted over what lies behind.
+  clump(at: vec2, r: f32, flat: f32, f: wood.Leaves, cs: i32) {
+    stream_push(cs)
+    c = {clamp(at.x, r * 1.15 + 1.0, 127.0 - r * 1.15), clamp(at.y, r * flat * 1.2 + 2.0, 112.0)}
+    crown = {c.x, c.y, r}
+    n = 2 + int(r / 6.0) + (0 to 1)
+    ox = sampler(-0.55 to 0.55).pick(6)
+    oy = sampler(-0.6 to 0.3).pick(6)
+    rs = sampler(0.36 to 0.52).pick(6)
+    dense = sampler(0.36 to 0.6).pick(6)
+    // The clump drifts a little towards a cool blue or a warm yellow, and
+    // a little lighter or darker, than the rest of the tree.
+    drift = #3c5a8c to #e8cc48
+    amount = 0.0 to 0.14
+    lift = -10 to 10
+    tones = [drifted(f.deep, drift, amount, lift), drifted(f.shade, drift, amount, lift), drifted(f.base, drift, amount, lift),
+             drifted(f.light, drift, amount, lift), drifted(f.glint, drift, amount, lift)]
+    grain = hash(cs ^ 0x1eaf)
+    puff(c, r * 0.66, flat, c, r, -0.08, 0.48, tones, grain)
+    for k in 0..n {
+      puff(c + {ox[k] * r, oy[k] * r * flat}, r * rs[k], flat, c, r, 0.05 * float(k), dense[k], tones, grain)
+    }
+    stream_pop()
+  }
+
+  // A leaf tone drifted towards a clump's own tint and brightness.
+  drifted(tone: color, drift: color, amount: f32, lift: i32) -> color {
+    return color.shade(color.mix(tone, drift, amount), lift)
+  }
+
+  // One puff of a clump: a ball of small leaves lit from the upper left,
+  // painted in runs row by row. A cellular grain splits it into leaves a
+  // pixel or two across and the dark gaps between them (`dense` sets how
+  // much of it is leaves); a leaf takes its tone from the light where it
+  // sits, a gap stays in shade, and only leaves stick out past the puff's
+  // outline. The lower half of the clump is in its own shade; puffs
+  // further in front (a larger lift) are a little lighter.
+  puff(pc: vec2, pr: f32, flat: f32, c: vec2, r: f32, lift: f32, dense: f32, tones: list<color>, grain: i32) {
+    ry = pr * flat
+    step = 1.0 / pr
+    for y in int(pc.y - ry - 1.0)..int(pc.y + ry + 2.0) {
+      fy = float(y) + 0.5
+      v = (fy - pc.y) / ry
+      vv = v * v
+      if (vv < 1.3) {
+        rowLight = lift - 0.31 * v - 0.3 * clamp((fy - c.y) / (r * flat), -1.0, 1.0)
+        reach = pr * sqrt(1.3 - vv)
+        x0 = int(pc.x - reach)
+        x1 = int(pc.x + reach) + 1
+        fx = float(x0) + 0.5
+        u = (fx - pc.x) / pr
+        run = -1
+        runX = x0
+        for x in x0..x1 + 1 {
+          tone = -1
+          if (x < x1) {
+            q = u * u + vv
+            onLeaf = noise.cell(fx * 0.55, fy * 0.55, grain) < dense
+            edge = 1.0
+            if (q > 0.65) { edge = 0.9 + (noise(fx * 0.5, fy * 0.5, grain) - 0.5) * 0.4 + 0.3 * onLeaf }
+            if (q < edge) {
+              t = 0.3 * sqrt(max(0.0, 1.0 - q)) - 0.25 * u + rowLight + (noise(fx * 0.6, fy * 0.6, grain ^ 0x51) - 0.5) * 0.6
+              tone = 0
+              if (onLeaf) {
+                tone = 1
+                if (t > 0.62) { tone = 4 } else if (t > 0.3) { tone = 3 } else if (t > -0.05) { tone = 2 }
+              } else if (t > 0.08) {
+                tone = 1
+              }
+            }
+            fx = fx + 1.0
+            u = u + step
+          }
+          if (tone != run) {
+            if (run >= 0) { rect(runX, y, x - runX, 1, tones[run]) }
+            run = tone
+            runX = x
+          }
+        }
+      }
+    }
+  }
+
+  // Leaves on a bare twig's tip: two to four short strokes fanned round
+  // the twig's direction.
+  sprig(p: vec2, a: f32, f: wood.Leaves, hs: i32) {
+    stream_push(hs)
+    n = 2 to 4
+    for k in 0..n {
+      la = a + (-1.0 to 1.0)
+      tone = pick(f.base, f.light, f.light, f.shade)
+      line(p, p + {cos(la), sin(la)} * (1.6 to 2.8), 1, tone)
+    }
+    stream_pop()
+  }
+}

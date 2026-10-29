@@ -1,0 +1,305 @@
+// Blade silhouettes, planar steel, gilded roots and fitted runic engraving.
+// u is across the blade; s runs from the guard towards the upper-left tip.
+// Pixel centres are evaluated in that local frame, never a rotated bitmap.
+// soldier 1: clean forged steel with a fuller and no gilding or engraving;
+// enchanted, only a thin inlay along the fuller lights up.
+
+import mats from "materials.ips"
+
+asset SwordBlade {
+  size 96x96
+  // 1 lights the runes (and a soldier blade's inlay).
+  input u32 lit = 0
+
+  input f32 cx = 60.5
+  input f32 cy = 60.5
+  input f32 length = 63.0
+  input f32 width = 5.5
+  input u32 profile = 0
+  input f32 bend = 0.0
+  input u32 ornament = 0
+  input color metal = #b89a56
+  input color magic = #bd69ff
+  input u32 power = 2
+  input u32 renderPass = 0
+  input u32 soldier = 0
+
+  // Stream keys: hash(seed ^ key) seeds one purpose.
+  const i32 ornamentKey = 0x27d4eb2d
+  const i32 runeKey = 0x165667b1       // where the rows of runes start
+
+  draw {
+    metal_fff2ceTones = tintSteps(metal, #fff2ce)
+    metal_scaleTones = scaleSteps(metal)
+    magic_ffffffTones = tintSteps(magic, #ffffff)
+    magic_scaleTones = scaleSteps(magic)
+    // A darkened ornament forges the blade from darker steel.
+    steel = mats.Steel()
+    if (ornament == 3) { steel = mats.Steel(base = #71869a, deep = #293e54) }
+    ink = steel.ink
+    edge = steel.edge
+    steelTones = facetTones(steel.deep, steel.base, edge)
+    steelDeep = steelTones[0]
+    steelShade = steelTones[1]
+    steelMid = steelTones[2]
+    steelLight = steelTones[4]
+    edge = steelTones[6]
+    // A honed edge is a narrow reflective plane, distinct from the blade face.
+    cuttingTones = stepper(#4d6578 to edge).pick(7)
+    farCuttingTones = stepper(#283c50 to #bccfdc).pick(7)
+    goldLight = lightStep(metal_fff2ceTones, 0.62)
+    goldShade = lightStep(metal_scaleTones, 0.56)
+    runeStroke = 0.43
+    steelTint = 0.12
+    runeBright = lightStep(magic_ffffffTones, 0.48)
+    runeRim = lightStep(magic_ffffffTones, 0.20)
+    if (lit == 1) {
+      if (power == 1) {
+        runeStroke = 0.34
+        steelTint = 0.06
+        runeBright = color.scale(lightStep(magic_ffffffTones, 0.40), 0.80)
+        runeRim = lightStep(magic_scaleTones, 0.78)
+      } else if (power == 3) {
+        runeStroke = 0.58
+        steelTint = 0.24
+        runeBright = lightStep(magic_ffffffTones, 0.54)
+        runeRim = lightStep(magic_ffffffTones, 0.35)
+      } else if (power == 4) {
+        runeStroke = 0.74
+        steelTint = 0.36
+        runeBright = lightStep(magic_ffffffTones, 0.60)
+        runeRim = lightStep(magic_ffffffTones, 0.48)
+      }
+    }
+    // The soldier's fuller runs from the guard over two thirds of the blade;
+    // its inlay lights the middle stretch, as wide as the runes would be.
+    fullerEnd = length * 0.66
+    inlayFrom = length * 0.18
+    inlayTo = length * 0.62
+    ornamentSeed = hash(seed ^ ornamentKey)
+    runePhase = roll(hash(ornamentSeed ^ runeKey), 0.0, 2.0)
+
+    // Visit only a diagonal strip, rather than the whole bounding square.
+    // This leaves fuel for the hilt, inlay and optional native bloom.
+    strip = int(ceil((width + 1.6) * 1.41421356))
+    stripRight = strip
+    if (profile == 4) { stripRight = int(ceil((width + bend + 1.4) * 1.41421356)) }
+    for y in 9..70 {
+      xmin = int(max(9, max(y - strip, 119.0 - length * 1.41421356 - float(y))))
+      xmax = int(min(70, min(y + stripRight + 1, 122 - y)))
+      for x in xmin..xmax {
+        dx = float(x) + 0.5 - cx
+        dy = float(y) + 0.5 - cy
+        s = -(dx + dy) * 0.70710678
+        u = (dx - dy) * 0.70710678
+        if (s >= -0.7 && s <= length + 0.7 &&
+            (renderPass == 0 || (lit == 1 && s > length * 0.18 && s < length * 0.83))) {
+          t = clamp(s / length, 0.0, 1.0)
+          hw = halfWidth(t, width, profile)
+          // Curvature is a displacement of the centreline, not added width.
+          centre = 0.0
+          if (profile == 2) { centre = sin(t * 3.14159265) * bend }
+          else if (profile == 3) { centre = sin(t * 15.7079633) * bend }
+          else if (profile == 4) { centre = t * t * bend }
+          else if (profile == 5) { centre = t * bend }
+          q = u - centre
+          d = max(abs(q) - hw, max(-s, s - length))
+          if (profile == 5 && t > 0.18 && t < 0.65) {
+            tooth = s - floor(s / 9.0) * 9.0
+            notch = max(0.0, 1.25 - abs(tooth - 4.5) * 0.65)
+            d = max(d, q - (hw - notch))
+          }
+          if (d <= 0.5 && (renderPass == 0 || abs(q) < 2.3)) {
+            if (renderPass == 0) {
+              c = ink
+              if (d < -0.65) {
+                // Reflections retain the contrast between the two flat faces.
+                plane = 2
+                if (q < -0.45) { plane = 3 }
+                if (q > 0.55) { plane = 1 }
+                if (abs(q) < 0.42) { plane = 4 }
+                reflection = t + q * 0.008
+                if (reflection > 0.29 && reflection < 0.40) { plane = plane + 1 }
+                if (reflection > 0.63 && reflection < 0.70) { plane = plane + 1 }
+                c = steelTones[plane]
+                if (q > 0.8 && q < 1.55 && t > 0.16 && t < 0.83) { c = steelDeep }
+
+                // Sparse material wear inside the face, away from the bevel.
+                wear = hash(ornamentSeed ^ (int(s * 1.5) * 73856093) ^ (int(q) * 19349663)) & 255
+                if (wear < 5 && d < -2.4 && abs(q) > 1.5) { c = steelTones[0] }
+
+                if (soldier == 1 && s > 2.5 && s < fullerEnd && abs(q) < 1.25 && d < -1.9) {
+                  // A forged groove: a dark floor between a lit and a shaded lip.
+                  c = steelDeep
+                  if (q < -0.55) { c = steelLight }
+                  if (q > 0.6) { c = steelShade }
+                }
+                // Gilded shoulders and a short engraved flourish at the root.
+                if (soldier == 0 && s < 9.0 && s > 1.5) {
+                  if (abs(q) > hw - 2.7 || s < 3.7) {
+                    c = metal
+                    if (q < 0.0) { c = goldLight }
+                    else { c = goldShade }
+                  }
+                }
+                if (soldier == 0 && s > 6.5 && s < 16.0 && d < -2.0) {
+                  flourish = rootFlourish({q, s}, ornament)
+                  if (flourish < 0.45) { c = goldLight }
+                }
+                if (lit == 1 && d < -1.7 && abs(q) < 2.2 && s > 16.0 && t < 0.86) {
+                  c = color.mix(c, magic, steelTint)
+                }
+              }
+              // Light ends at the apex instead of rounding over a dark rim.
+              // The bevel tracks the actual contour, including curved/notched blades.
+              if (s > 2.5) {
+                edgeDepth = -d
+                bevelWidth = clamp(hw * 0.30, 0.85, 1.7)
+                if (edgeDepth < bevelWidth) {
+                  level = clamp(round((1.0 - max(edgeDepth, 0.0) / bevelWidth) * 6.0), 0, 6)
+                  if (q < 0.0) { c = cuttingTones[level] }
+                  else { c = farCuttingTones[level] }
+                  if (edgeDepth < 0.55 && q < 0.0) { c = cuttingTones[6] }
+                  if (edgeDepth < 0.55 && q >= 0.0) { c = farCuttingTones[6] }
+                }
+              }
+              pixel(x, y, c)
+            }
+
+            if (soldier == 1 && lit == 1 && s > inlayFrom && s < inlayTo && abs(q) < max(runeStroke, 0.55)) {
+              c = runeBright
+              if (q > 0.2) { c = runeRim }
+              pixel(x, y, c)
+            }
+            // Runes fit within the same silhouette used for the steel face.
+            if (soldier == 0 && s > length * 0.28 && s < length * 0.83 && d < -2.1) {
+              spacing = 8.0
+              if (ornament == 1) { spacing = 11.0 }
+              if (ornament == 2) { spacing = 9.5 }
+              row = int(floor((s - 17.0 - runePhase) / spacing))
+              rs = 17.0 + spacing * 0.44 + runePhase + float(row) * spacing
+              kind = (hash(ornamentSeed ^ (row * 913)) & 0x7fffffff) % 3
+              rd = engravingDistance({q - 0.2, s - rs}, kind, ornament)
+              if (renderPass == 0 && rd < 0.95) { pixel(x, y, #3a4755) }
+              if (rd < runeStroke) {
+                if (lit == 1) {
+                  c = runeBright
+                  if (q > 0.5) { c = runeRim }
+                  pixel(x, y, c)
+                } else if (renderPass == 0) { pixel(x, y, #76888e) }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  halfWidth(t: f32, w: f32, k: i32) -> f32 {
+    if (k == 0) {
+      if (t < 0.14) { return w * (0.74 + t * 1.1) }
+      if (t < 0.77) { return w * (0.93 - t * 0.18) }
+      return w * 0.79 * (1.0 - t) / 0.23
+    }
+    if (k == 1) {
+      if (t < 0.12) { return w * 0.46 }
+      if (t < 0.52) { return w * (0.46 + (t - 0.12) * 1.35) }
+      return w * (1.0 - t) / 0.48
+    }
+    if (k == 3) {
+      taper = 1.0
+      if (t > 0.77) { taper = (1.0 - t) / 0.23 }
+      return w * (0.78 + sin(t * 15.7079633) * 0.16) * taper
+    }
+    if (k == 4) {
+      if (t < 0.78) { return w * (0.83 - t * 0.15) }
+      return w * 0.713 * (1.0 - t) / 0.22
+    }
+    if (k == 5) {
+      if (t < 0.12) { return w * 0.56 }
+      if (t < 0.70) { return w * 0.82 }
+      return w * 0.82 * (1.0 - t) / 0.30
+    }
+    // A barbed shoulder, broad upper blade and angular spear point.
+    if (t < 0.09) { return w * 0.42 }
+    if (t < 0.16) { return w * (0.90 - (t - 0.09) * 4.0) }
+    if (t < 0.40) { return w * (0.62 + (t - 0.16) * 0.25) }
+    if (t < 0.68) { return w * (0.68 + (t - 0.40) * 1.14) }
+    if (t < 0.78) { return w * (1.0 - (t - 0.68) * 2.0) }
+    return w * 0.80 * (1.0 - t) / 0.22
+  }
+
+  rootFlourish(p: vec2, style: i32) -> f32 {
+    if (style == 1) {
+      // Heraldic spearhead above a crossbar.
+      return min(abs(abs(p.x) + abs(p.y - 11.0) * 0.55 - 1.6),
+                 dist.line(p, {-1.8, 8.0}, {1.8, 8.0}))
+    }
+    if (style == 2) {
+      // Leaf pairs along a central stem.
+      stem = dist.line(p, {0, 7}, {0, 15})
+      leaf = abs(abs(p.x) + abs(p.y - 11.0) * 0.8 - 1.7)
+      return min(stem, leaf)
+    }
+    if (style == 3) {
+      // A hooked fork framing a dark central slit.
+      return min(dist.line(p, {-2, 13}, {0, 8}), dist.line(p, {2, 13}, {0, 8}))
+    }
+    d = min(dist.line(p, {0, 7.5}, {-2.2, 12.5}), dist.line(p, {0, 7.5}, {2.2, 12.5}))
+    return min(d, dist.line(p, {0, 7}, {0, 15}))
+  }
+
+  engravingDistance(p: vec2, kind: i32, style: i32) -> f32 {
+    if (style == 1) {
+      // Open diamond seals, rather than another row of runic letters.
+      d = abs(abs(p.x) + abs(p.y) * 0.65 - 1.4) * 0.75
+      return min(d, max(abs(p.x) - 0.25, abs(p.y) - 2.3))
+    }
+    if (style == 2) {
+      d = dist.line(p, {0, -2.0}, {0, 2.0})
+      d = min(d, dist.line(p, {0, 0.5}, {-1.25, 1.65}))
+      return min(d, dist.line(p, {0, -0.75}, {1.25, 0.25}))
+    }
+    if (style == 3) {
+      d = dist.line(p, {-1.2, 1.7}, {0, -1.4})
+      d = min(d, dist.line(p, {1.2, 1.7}, {0, -1.4}))
+      return min(d, dist.line(p, {-0.75, 0.2}, {0.75, 0.2}))
+    }
+    return runeDistance(p, kind)
+  }
+
+  runeDistance(p: vec2, k: i32) -> f32 {
+    d = dist.line(p, {0, -1.8}, {0, 1.8})
+    if (k == 0) {
+      d = min(d, dist.line(p, {0, 1.4}, {-1.25, 0.1}))
+      d = min(d, dist.line(p, {0, 0.1}, {1.25, -1.1}))
+    } else if (k == 1) {
+      d = min(d, dist.line(p, {-1.2, 1.2}, {1.2, 1.2}))
+      d = min(d, dist.line(p, {-1.2, -0.8}, {0, 0.2}))
+    } else {
+      d = min(d, dist.line(p, {-1.2, -1.2}, {0, -0.2}))
+      d = min(d, dist.line(p, {0, -0.2}, {1.2, -1.2}))
+      d = min(d, dist.line(p, {-1.0, 1.0}, {1.0, 1.0}))
+    }
+    return d
+  }
+  // These immutable ramps are built once per material in a painting helper.
+  scaleSteps(base: color) -> list<color> {
+    return stepper(color.set.a(#000000, base.a) to base).pick(17)
+  }
+  tintSteps(base: color, target: color) -> list<color> {
+    return stepper(base to color.set.a(target, base.a)).pick(17)
+  }
+  lightStep(tones: list<color>, position: f32) -> color {
+    return tones[clamp(round(position * 16.0), 0, 16)]
+  }
+
+  // Base is shared by the shadow and highlight steps of one material.
+  facetTones(dark: color, base: color, light: color) -> list<color> {
+    shadows = stepper(dark to base).pick(3)
+    highlights = stepper(base to light).pick(5)
+    return [shadows[0], shadows[1], base, highlights[1],
+            highlights[2], highlights[3], highlights[4]]
+  }
+
+}

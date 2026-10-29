@@ -1,0 +1,28 @@
+// materials.ips — the sword's materials, shared by its parts. Parts receive
+// colours from the root and build the instances they need here, so every tone
+// of a gem follows the stone (or the enchantment) it is cut from.
+
+// Forged steel of ornate and soldier blades: its face, the deep tone of the
+// fuller and the flat, the polished edge and the outline. A darkened ornament
+// passes a darker base and deep tone.
+material Steel {
+  base = #8196a2
+  deep = #344653
+  edge = #f3f8fa
+  ink = #15181d
+}
+
+// Gemstones in guards and pommels; a lit gem passes brighter overrides.
+material Gem {
+  base = #426879
+  light = color.mix(base, #ffffff, 0.74)
+  mid = color.mix(base, #ffffff, 0.20)
+  shade = color.scale(base, 0.64)
+}
+
+// Rust on plain iron: the patch, its deep pits and a dry crust.
+material Rust {
+  base = #795d46
+  deep = #6b523e
+  dry = #8a6549
+}

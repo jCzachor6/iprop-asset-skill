@@ -1,0 +1,17 @@
+// band.ips — a part: an iron band across the crate. It takes a colour and builds its material.
+import looks from "../looks.ips"
+
+asset Band {
+  size 32x32
+  origin 16, 16
+  input f32 half = 10.0
+  input color iron = #7a848c
+  output point rivet
+
+  draw {
+    m = looks.Iron(base = iron)
+    rect(16.0 - half, 15.0, half * 2.0, 2.0, m.shadow)
+    rect(16.0 - half, 15.0, half * 2.0, 1.0, m.light)
+    rivet = {16.0 - half + 1.0, 16.0}
+  }
+}

@@ -1,0 +1,8 @@
+schema_version: "1.1"
+name: potted-plant-parts
+expected_outcome: |
+  A plant/ folder holds a 64x64 Infinite Props asset seen from the side: a root that imports a pot
+  part and a plant part, and a material library the leaves come from. It compiles with 0.8.0,
+  renders seeds 1-200 without traps, varies per seed, and declares an anchor at the bottom of the
+  pot, a collider and a point at the top of the plant. Species and pot colours are axes that are
+  easy to extend (for example a weighted kind and palettes or materials).

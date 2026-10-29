@@ -1,0 +1,54 @@
+// The bark, leaves, needles and cones of the tree and the spruce. Every
+// tone of a material follows its rolled base, so a grey bark, an autumn
+// crown or a blue-green spruce keeps the shading of the brown and green ones:
+// darker and cooler in the shade, lighter where the light falls.
+
+material Bark {
+  // The body of the trunk and limbs.
+  base = #382824 to #5e4436 with gaussian(mean = 0.5, sigma = 0.25)
+  // The outline and the shaded side.
+  deep = color.scale(color.mix(base, #241c2c, 0.15), 0.76)
+  // Thin twigs, between the outline and the body.
+  twig = color.mix(deep, base, 0.45)
+  // The lit strands that twist round the trunk.
+  light = color.scale(color.mix(base, #b07050, 0.1), 1.28)
+  // Strands turned half towards the light.
+  sheen = color.mix(base, light, 0.5)
+  // A few bright flecks on the lit side.
+  glint = color.scale(color.mix(base, #c08868, 0.15), 1.42)
+}
+
+material Leaves {
+  // The middle tone of a clump.
+  base = #3c6632 to #7aa04a with gaussian(mean = 0.5, sigma = 0.25)
+  // The dark inside of a clump, showing between the leaves.
+  deep = color.mix(color.scale(base, 0.6), #3a3a30, 0.35)
+  // Leaves turned away from the light.
+  shade = color.mix(base, deep, 0.5)
+  // Leaves in the light, a little warmer.
+  light = color.mix(color.scale(base, 1.2), #e8e070, 0.06)
+  // The brightest leaf tips, on the lit side only.
+  glint = color.mix(light, #e8f0a0, 0.35)
+}
+
+material Needles {
+  // The middle tone of a tier of needles: a dark spruce green.
+  base = #2c4a34 to #46664a with gaussian(mean = 0.5, sigma = 0.25)
+  // The shadow under a tier, a cool dark.
+  deep = color.mix(color.scale(base, 0.5), #101c24, 0.35)
+  // Needles turned away from the light.
+  shade = color.mix(base, deep, 0.5)
+  // Needles in the light, a little paler.
+  light = color.mix(color.scale(base, 1.22), #c8dcc0, 0.1)
+  // The lightest needle tips, on the lit side only.
+  glint = color.mix(light, #d4e8b8, 0.2)
+}
+
+material Cone {
+  // A hanging spruce cone.
+  base = #5c3e2a to #7a5638 with gaussian(mean = 0.5, sigma = 0.25)
+  // Its shaded underside.
+  deep = color.scale(color.mix(base, #2a1c24, 0.2), 0.7)
+  // Its lit scales.
+  light = color.mix(color.scale(base, 1.25), #e0b080, 0.1)
+}

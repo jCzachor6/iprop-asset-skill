@@ -1,0 +1,167 @@
+// Inexpensive forged steel: matte faces, a honed edge, rust patches and pitting.
+// No face-wide specular stripe, gilding, engraving, gems or emitting pixels.
+
+import mats from "materials.ips"
+
+asset PlainSwordBlade {
+  size 96x96
+  input f32 cx = 60.5
+  input f32 cy = 60.5
+  input f32 length = 60
+  input f32 width = 4
+  input u32 style = 0
+  input f32 bend = 0
+  input color iron = #777874
+  input f32 wear = 1.0
+  // 0 rolls; 1 blotches, 2 streaks, 3 speckles, 4..7 combinations, 8 none.
+  input u32 rust = 0
+  input u32 renderPass = 0
+
+  palette rustMasks = [1, 2, 4, 3, 5, 6, 7, 0]
+
+  const distribution rustMixture = weighted {1: 25, 2: 25, 3: 25, 4: 7, 5: 6, 6: 7, 7: 5}
+
+  // Stream keys: hash(seed ^ key) seeds one purpose. The wear rolls the
+  // three rust patches: where each sits along the blade and across it.
+  const i32 rustKey = 0xb5297a4d
+  const i32 wearKey = 0x27d4eb2d
+  const i32 alongAKey = 0x243f6a88
+  const i32 alongBKey = 0x85a308d3
+  const i32 alongCKey = 0x13198a2e
+  const i32 acrossAKey = 0x03707344
+  const i32 acrossBKey = 0xa4093822
+  const i32 acrossCKey = 0x299f31d0
+
+  rustLayers(mode: i32) -> i32 {
+    stream_push(hash(seed ^ rustKey))
+    look = 1 to 7 with rustMixture
+    stream_pop()
+    if (mode >= 1 && mode <= 8) { look = mode }
+    return rustMasks[look - 1]
+  }
+
+  draw {
+    rustLook = mats.Rust()
+    iron_brightnessSteps = brightnessSteps(iron)
+    layers = rustLayers(int(rust))
+    ink = #292b29
+    face = iron
+    side = shadeLevel(iron_brightnessSteps, -17)
+    flatLight = shadeLevel(iron_brightnessSteps, 4)
+    cuttingTones = stepper(color.shade(iron, -24) to color.mix(iron, #e7edf0, 0.78)).pick(7)
+    farCuttingTones = stepper(color.shade(iron, -30) to color.mix(iron, #a6bdcb, 0.60)).pick(7)
+    rustBase = rustLook.base
+    rustDeep = rustLook.deep
+    rustDry = rustLook.dry
+    rustThreshold = int(218.0 * clamp(wear, 0.0, 1.0))
+    patchThreshold = 0.10 + (1.0 - clamp(wear, 0.0, 1.0)) * 0.48
+    pitThreshold = int(5.0 * clamp(wear, 0.0, 1.0))
+    wearSeed = hash(seed ^ wearKey)
+    rustA = length * roll(hash(wearSeed ^ alongAKey), 0.22, 0.34)
+    rustB = length * roll(hash(wearSeed ^ alongBKey), 0.53, 0.67)
+    rustC = length * roll(hash(wearSeed ^ alongCKey), 0.76, 0.85)
+    ua = roll(hash(wearSeed ^ acrossAKey), -1.8, 0.5)
+    ub = roll(hash(wearSeed ^ acrossBKey), -0.3, 1.8)
+    uc = roll(hash(wearSeed ^ acrossCKey), -1.0, 1.0)
+    strip = int(ceil((width + 1.8) * 1.41421356))
+
+    if (renderPass == 0) {
+      for y in 9..68 {
+        xmin = int(max(9, max(y - strip, 119.0 - length * 1.41421356 - float(y))))
+        xmax = int(min(68, min(y + strip + 1, 122 - y)))
+        for x in xmin..xmax {
+          dx = float(x) + 0.5 - cx
+          dy = float(y) + 0.5 - cy
+          s = -(dx + dy) * 0.70710678
+          u = (dx - dy) * 0.70710678
+          if (s >= -0.7 && s <= length + 0.7) {
+            t = clamp(s / length, 0.0, 1.0)
+            centre = 0.0
+            if (style == 3) { centre = t * t * bend }
+            q = u - centre
+            hw = halfWidth(t, width, style)
+            d = max(abs(q) - hw, max(-s, s - length))
+            // Shallow blunt nicks retain a continuous, serviceable blade.
+            nick = max(0.0, 0.6 - abs(s - rustA - 7.0) * 0.7)
+            d = max(d, q - hw + nick)
+            if (d <= 0.5) {
+              col = ink
+              if (d < -0.65) {
+                col = face
+                if (q < -0.6) { col = flatLight }
+                if (q > 0.7) { col = side }
+                speck = hash(wearSeed ^ (x * 73856093) ^ (y * 19349663)) & 255
+                // Independent overlays: a compact patch, a narrow streak,
+                // and a broken, stippled patch. Only the selected set paints.
+                patch = -1.0
+                if ((layers & 1) != 0) {
+                  patch = max(patch, 1.0 - abs(s - rustA) / 3.8 - abs(q - ua) / 1.7)
+                }
+                if ((layers & 2) != 0) {
+                  patch = max(patch, 1.0 - abs(s - rustB) / 5.5 -
+                              abs(q - ub - (s - rustB) * 0.10) / 0.95)
+                }
+                if ((layers & 4) != 0 && speck < 120) {
+                  patch = max(patch, 1.0 - abs(s - rustC) / 2.7 - abs(q - uc) / 1.8)
+                }
+                if (patch > -0.5 && wear > 0.0) {
+                    patch = patch + noise.grad(float(x) * 0.22, float(y) * 0.22, wearSeed) * 0.14
+                  }
+                  if (patch > patchThreshold && speck < rustThreshold) {
+                  col = rustBase
+                  if (patch > 0.48) { col = rustDeep }
+                  if (speck < 65) { col = rustDry }
+                } else if (speck < pitThreshold && d < -1.8) { col = shadeLevel(iron_brightnessSteps, -23) }
+              }
+              // The face can weather; the narrow cutting plane is freshly honed.
+              if (s > 2.5) {
+                edgeDepth = -d
+                bevelWidth = clamp(hw * 0.30, 0.8, 1.5)
+                if (edgeDepth < bevelWidth) {
+                  level = clamp(round((1.0 - max(edgeDepth, 0.0) / bevelWidth) * 6.0), 0, 6)
+                  col = cuttingTones[level]
+                  if (q > 0.0) { col = farCuttingTones[level] }
+                  if (edgeDepth < 0.55) {
+                    col = cuttingTones[6]
+                    if (q > 0.0) { col = farCuttingTones[6] }
+                  }
+                }
+              }
+              pixel(x, y, col)
+            }
+          }
+        }
+      }
+    }
+  }
+
+  halfWidth(t: f32, w: f32, k: i32) -> f32 {
+    if (k == 1) {
+      if (t < 0.70) { return w * (0.86 - t * 0.12) }
+      return w * 0.776 * (1.0 - t) / 0.30
+    }
+    if (k == 2) {
+      if (t < 0.86) { return w * 0.80 }
+      return w * 0.80 * (1.0 - t) / 0.14
+    }
+    if (k == 3) {
+      if (t < 0.79) { return w * (0.86 - t * 0.11) }
+      return w * 0.773 * (1.0 - t) / 0.21
+    }
+    if (t < 0.78) { return w * (0.86 - t * 0.20) }
+    return w * 0.704 * (1.0 - t) / 0.22
+  }
+
+  // Material tones are deterministic; index 16 is the exact base colour.
+  brightnessSteps(base: color) -> list<color> {
+    shadows = stepper(color.shade(base, -80) to base).pick(17)
+    highlights = stepper(base to color.shade(base, 80)).pick(17)
+    return [shadows[0], shadows[1], shadows[2], shadows[3], shadows[4], shadows[5], shadows[6], shadows[7], shadows[8], shadows[9], shadows[10], shadows[11], shadows[12], shadows[13], shadows[14], shadows[15], base, highlights[1], highlights[2], highlights[3], highlights[4], highlights[5], highlights[6], highlights[7], highlights[8], highlights[9], highlights[10], highlights[11], highlights[12], highlights[13], highlights[14], highlights[15], highlights[16]]
+  }
+
+  shadeLevel(tones: list<color>, amount: i32) -> color {
+    return tones[clamp(16 + round(float(amount) * 0.2), 0, 32)]
+  }
+
+
+}

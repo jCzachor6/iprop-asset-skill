@@ -1,0 +1,281 @@
+// shield.ips — procedural shields for a top-down roguelike, to hold and to
+// pick up. Native 48x48, seen face-on (the way top-down and three-quarter
+// games show held items and pickups), lit from the upper left, symmetric
+// about x = 24 and laid out around the canvas centre (the origin, 24,24).
+//
+// One part per characteristic feature:
+//   parts/board.ips   the body: silhouette, wooden planks or metal plate,
+//                     field paint and its wear, the rim and its studs
+//   parts/boss.ips    the boss in the middle, over the hand
+//   parts/emblem.ips  a painted emblem, clipped to the paint on the board
+// materials.ips holds the wood, metal, rawhide and paint they share.
+//
+// A seed alone gives a different shield: its shape family (round 22%, heater
+// 22%, kite 14%, buckler 12%, oval 10%, tower 10%, hex 7%, waisted 3%), its
+// proportions, a wooden or metal body (a third metal; bucklers three in four,
+// towers one in seven), the rim (a metal band, rawhide, or the plate's rolled
+// edge; studded on some), the boss (dome, flanged, spike, plate or studded),
+// a painted field on a third of the wooden boards (and a few enamelled
+// plates), an emblem on half of the shields, and the wear: chipped paint.
+// A buckler's face is a thin ring around its big boss, so it stays bare
+// unless an emblem is forced. Emblems keep the rule of tincture (a colour on
+// a metal, a metal on a colour). Each concern rolls in a stream of its own.
+//
+// Inputs:
+//   shape   0 rolls; 1 round, 2 heater, 3 kite, 4 buckler, 5 oval, 6 tower,
+//           7 hex, 8 waisted
+//   body    0 rolls; 1 wooden, 2 metal
+//   emblem  0 rolls; 1 none, 2 cross, 3 saltire, 4 chevron, 5 per pale,
+//           6 quarterly, 7 bend, 8 fess, 9 ring, 10 gyronny, 11 sun rays,
+//           12 lozenge, 13 chief, 14 pale
+//   paint   transparent rolls the paint; any other colour paints the field,
+//           or the emblem on a bare face (team colours)
+// Outputs, in canvas pixels (y down):
+//   anchor    the foot of the shield on its centre line: where it rests on
+//             the ground (dropped shields, y-sorting)
+//   grip      where the hand holds it, behind the boss: attach it to the hand
+//   collider  the shield's bounds, rim and outline included
+//
+// Variety: high
+
+import board from "parts/board.ips"
+import boss from "parts/boss.ips"
+import heraldry from "parts/emblem.ips"
+import mats from "materials.ips"
+
+asset Shield {
+  size 48x48
+  origin 24, 24
+  input u32 shape = 0               // 0 rolls; 1 round .. 8 waisted (see above)
+  input u32 body = 0                // 0 rolls; 1 wooden, 2 metal
+  input u32 emblem = 0              // 0 rolls; 1 none, 2..14 a design (see above)
+  input color paint = #00000000     // transparent rolls the paint; a colour sets it
+  output point anchor
+  output point grip
+  output rect collider
+
+  // Proportions cluster around the typical shield; extremes stay rare.
+  const distribution typical = gaussian(mean = 0.5, sigma = 0.2)
+  // Shape families 1..8, in the order of the `shape` input.
+  const distribution shapes = weighted {1: 22, 2: 22, 3: 14, 4: 12, 5: 10, 6: 10, 7: 7, 8: 3}
+  // Bosses: 1 dome, 2 flanged dome, 3 spike, 4 plate, 5 studded dome.
+  const distribution bossStyles = weighted {1: 36, 2: 24, 3: 12, 4: 16, 5: 12}
+  // Emblem designs 1..13, in the order of the `emblem` input (2..14).
+  const distribution designs = weighted {1: 12, 2: 7, 3: 8, 4: 9, 5: 9, 6: 8, 7: 7, 8: 7, 9: 9, 10: 6, 11: 6, 12: 6, 13: 6}
+  // Heraldic colours (red, blue, green, black, purple) and metals (gold,
+  // silver), each a gradient; the colours by weight.
+  palette colours = [#8e2622 to #a8342a, #22407a to #2e5296, #285a30 to #347040, #26242c to #36323c, #5a2858 to #6c3468]
+  palette metalTints = [#c49a2c to #d8b244, #b4b2aa to #ccc9c0]
+  const distribution hues = weighted {0: 32, 1: 28, 2: 16, 3: 16, 4: 8}
+  // Stream keys, one per purpose: hash(seed ^ key) seeds that purpose's
+  // stream or part. The four passes of one emblem share emblemKey, so they
+  // draw the same shapes. Keep the keys fixed once a game stores seeds.
+  const i32 familyKey = 0x2f6b9a13
+  const i32 buildKey = 0x51ed2701
+  const i32 bodyKey = 0x3c6ef372
+  const i32 colorKey = 0x6c8e9cf5
+  const i32 paintKey = 0x41c64e6d
+  const i32 boardKey = 0x85ebca6b
+  const i32 emblemKey = 0x27d4eb2f
+  const i32 bossKey = 0xc2b2ae35
+
+  draw {
+    // ---- the shape family: hashed, so a rolled shape renders exactly like
+    // the same shape forced
+    look = clamp(shape, 0, 8)
+    if (look == 0) {
+      stream_push(hash(seed ^ familyKey))
+      look = 1 to 8 with shapes
+      stream_pop()
+    }
+
+    // ---- the build: every roll, whatever the family ----------------------------
+    stream_push(hash(seed ^ buildKey))
+    sizeRoll = 0.0 to 1.0 with typical
+    tallRoll = 0.0 to 1.0 with typical
+    bendRoll = 0.0 to 1.0 with typical
+    bossRoll = 0.0 to 1.0 with typical
+    rimRoll = 0.0 to 1.0 with typical
+    planks = 3 to 6
+    bossStyle = 1 to 5 with bossStyles
+    studded = chance(0.45)
+    wear = 0.0 to 1.0 with beta(alpha = 1.5, beta = 4.0)
+    stream_pop()
+
+    half = lerp(15.0, 19.5, sizeRoll)            // 1 round
+    tall = half * 2.0
+    bossR = lerp(3.5, 5.0, bossRoll)
+    if (look == 2) {                             // heater
+      half = lerp(14.0, 18.0, sizeRoll)
+      tall = lerp(34.0, 41.0, tallRoll)
+      bossR = lerp(3.0, 4.5, bossRoll)
+    } else if (look == 3) {                      // kite
+      half = lerp(12.0, 15.0, sizeRoll)
+      tall = lerp(38.0, 42.0, tallRoll)
+      bossR = lerp(3.0, 4.5, bossRoll)
+    } else if (look == 4) {                      // buckler: small, with a big boss
+      half = lerp(10.0, 13.0, sizeRoll)
+      tall = half * 2.0
+      bossR = lerp(4.5, 6.0, bossRoll)
+    } else if (look == 5 || look == 6) {         // oval, tower
+      half = lerp(12.5, 15.5, sizeRoll)
+      tall = lerp(36.0, 42.0, tallRoll)
+    } else if (look == 7) {                      // hex
+      half = lerp(13.0, 17.0, sizeRoll)
+      tall = lerp(36.0, 42.0, tallRoll)
+    } else if (look == 8) {                      // waisted
+      half = lerp(12.0, 15.0, sizeRoll)
+      tall = lerp(38.0, 42.0, tallRoll)
+    }
+    rimW = 2
+    if (rimRoll > 0.75 && look != 4) { rimW = 3 }
+
+    // ---- the body: wood or metal; bucklers lean metal, towers wood -------------
+    stream_push(hash(seed ^ bodyKey))
+    metalRoll = 0.0 to 1.0
+    stream_pop()
+    metalShare = 0.32
+    if (look == 4) { metalShare = 0.75 } else if (look == 6) { metalShare = 0.15 }
+    built = 1
+    if (metalRoll < metalShare) { built = 2 }
+    if (body == 1 || body == 2) { built = body }
+
+    // ---- colours: materials, the rim's look, the paints ------------------------
+    stream_push(hash(seed ^ colorKey))
+    wood = mats.Wood()
+    plate = mats.Metal()
+    band = mats.Metal()
+    hide = mats.Hide()
+    knob = mats.Metal()
+    rimPick = 0.0 to 1.0
+    bossPick = 0.0 to 1.0
+    fieldTone = colours[0 to 4 with hues].pick()
+    fieldMetal = metalTints[0 to 1].pick()
+    fieldIsMetal = chance(0.25)
+    chargeTone = colours[0 to 4 with hues].pick()
+    chargeMetal = metalTints[0 to 1].pick()
+    chargeIsMetal = chance(0.5)
+    stream_pop()
+
+    rimKind = 1                                  // a metal band
+    rimColour = band.base
+    if (built == 1 && rimPick < 0.45) {
+      rimKind = 2                                // rawhide
+      rimColour = hide.base
+    }
+    if (built == 2) {
+      rimKind = 3                                // the plate's rolled edge
+      rimColour = color.shade(plate.base, 8)
+      if (rimPick < 0.4) {
+        rimKind = 1
+        rimColour = band.base
+      }
+    }
+    bossColour = knob.base
+    if (rimKind != 2 && bossPick < 0.55) { bossColour = rimColour }
+    studs = 0
+    if (studded && rimKind != 2) { studs = 1 }
+
+    // ---- paint: a field on some wooden boards, an emblem on about half --------
+    stream_push(hash(seed ^ paintKey))
+    fieldRoll = 0.0 to 1.0
+    hasEmblem = chance(0.5)
+    design = 1 to 13 with designs
+    stream_pop()
+    // A buckler's face is a thin ring around its big boss: it stays bare
+    // unless an emblem is forced.
+    painted = 0
+    if (built == 1 && fieldRoll < 0.35 && look != 4) { painted = 1 }
+    if (built == 2 && fieldRoll < 0.08 && look != 4) { painted = 1 }
+    shown = 0
+    if (hasEmblem && look != 4) { shown = design }
+    if (emblem == 1) { shown = 0 }
+    if (emblem >= 2 && emblem <= 14) { shown = emblem - 1 }
+
+    fieldColour = fieldTone
+    if (fieldIsMetal) { fieldColour = fieldMetal }
+    if (paint.a != 0 && painted == 1) { fieldColour = color.set.a(paint, 255) }
+    // The emblem keeps the rule of tincture: a colour on a metal (a steel,
+    // silver or gilt plate, a gold or silver field), a metal on a colour (a
+    // dark plate, a coloured field). On bare wood, the rolled kind of
+    // tincture, unless the other one stands out more there.
+    under = wood.base
+    if (built == 2) { under = plate.base }
+    if (painted == 1) { under = fieldColour }
+    chargeColour = chargeTone
+    other = chargeMetal
+    if (chargeIsMetal) {
+      chargeColour = chargeMetal
+      other = chargeTone
+    }
+    if (built == 2 || painted == 1) {
+      chargeColour = chargeTone
+      if (luma(under) < 115.0) { chargeColour = chargeMetal }
+    } else {
+      gap = abs(luma(chargeColour) - luma(under))
+      if (gap < 60.0 && abs(luma(other) - luma(under)) > gap) { chargeColour = other }
+    }
+    if (paint.a != 0 && painted == 0) { chargeColour = color.set.a(paint, 255) }
+
+    // ---- the parts ----------------------------------------------------------------
+    field = #00000000
+    if (painted == 1) { field = fieldColour }
+    board.draw(hash(seed ^ boardKey), at = {0, 0}, shape = look, half = half, tall = tall,
+               bend = bendRoll, body = built, planks = planks, rimKind = rimKind, rimWidth = rimW,
+               studs = studs, wood = wood.base, metal = plate.base, rim = rimColour, field = field,
+               wear = wear)
+    // The board reports where the shield stands, its bounds and the boss.
+    anchor = board.outputs.foot
+    collider = board.outputs.bounds
+    bossAt = board.outputs.boss
+    grip = bossAt
+    room = board.outputs.room
+    mask paintArea = board.outputs.paint
+    mask litArea = board.outputs.lit
+    mask shadeArea = board.outputs.shade
+    mask seamArea = board.outputs.seams
+
+    // The boss keeps to half the face's width at its row (the waist of a
+    // waisted shield is narrow); flanges, plates and studs reach further.
+    extra = 0.0
+    if (bossStyle == 2 || bossStyle == 5) { extra = 2.0 } else if (bossStyle == 4) { extra = 1.5 }
+    bossR = clamp(min(bossR, room.x * 0.5 - extra), 2.5, 6.0)
+    reach = bossR + extra + 1.0
+
+    if (shown > 0) {
+      ink = mats.Paint(base = chargeColour)
+      rows = clamp(2 * round(tall * 0.5), 8, 42)
+      faceTop = float(24 - rows / 2 + rimW)
+      faceBottom = float(24 + rows / 2 - rimW)
+      faceHalf = half - float(rimW)
+      // Four passes of one emblem (same seed, same shapes): its paint, then
+      // its shadow, light and the seams beneath it, each clipped to that zone.
+      clip(paintArea) {
+        heraldry.draw(hash(seed ^ emblemKey), at = {0, 0}, design = shown, cx = bossAt.x, cy = bossAt.y,
+                      half = faceHalf, top = faceTop, bottom = faceBottom, bossR = reach, ink = ink.base)
+      }
+      clip(shadeArea) {
+        heraldry.draw(hash(seed ^ emblemKey), at = {0, 0}, design = shown, cx = bossAt.x, cy = bossAt.y,
+                      half = faceHalf, top = faceTop, bottom = faceBottom, bossR = reach, ink = ink.shadow)
+      }
+      clip(litArea) {
+        heraldry.draw(hash(seed ^ emblemKey), at = {0, 0}, design = shown, cx = bossAt.x, cy = bossAt.y,
+                      half = faceHalf, top = faceTop, bottom = faceBottom, bossR = reach, ink = ink.light)
+      }
+      clip(seamArea) {
+        heraldry.draw(hash(seed ^ emblemKey), at = {0, 0}, design = shown, cx = bossAt.x, cy = bossAt.y,
+                      half = faceHalf, top = faceTop, bottom = faceBottom, bossR = reach, ink = ink.deep)
+      }
+    }
+
+    boss.draw(hash(seed ^ bossKey), at = bossAt, style = bossStyle, radius = bossR, metal = bossColour)
+    mask bossShape = boss.outputs.footprint
+    // The boss casts a short shadow on the face, below and to the right.
+    surface.paint(mask.subtract(mask.offset(bossShape, 1, 1), bossShape), #10142060)
+  }
+
+  // Perceived brightness of a colour, 0..255.
+  luma(c: color) -> f32 {
+    return 0.299 * float(c.r) + 0.587 * float(c.g) + 0.114 * float(c.b)
+  }
+}

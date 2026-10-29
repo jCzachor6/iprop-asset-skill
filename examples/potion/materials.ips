@@ -1,0 +1,87 @@
+// materials.ips — the potion's materials, shared by the root and its parts.
+// Every closure, fitting and label of a potion takes its look from here, and
+// every tone of a material follows its rolled base, so a darker cork keeps a
+// matching shade and a paler brass a matching shine. Glass and liquid are not
+// materials: their colours come from the seed's elixir and travel to the parts
+// as plain colours.
+
+// The dark outline round every piece.
+material Outline {
+  base = #16222e
+}
+
+// Cork stoppers: each has its own tone of bark, mostly towards the warm end.
+material Cork {
+  base = #7c5126 to #ad7741 with beta(alpha = 3.0, beta = 2.0)
+  shadow = color.scale(base, 0.69)
+  light = color.mix(base, #d08a42, 0.42)
+}
+
+// Metal caps, crown caps, bands and neck rings: a cool pewter.
+material Pewter {
+  base = #929da8 to #9ca7b2
+  shadow = color.mix(base, #1f2a37, 0.5)
+  light = color.mix(base, #edf6ff, 0.5)
+}
+
+// Flat stoppers: grey slate with a dark rim.
+material Slate {
+  base = #949ba2 to #a0a7ae
+  shadow = color.mix(base, #0c1218, 0.66)
+  light = color.mix(base, #f2f6fa, 0.4)
+}
+
+// Cloth wrapped round a cork.
+material Cloth {
+  base = #96593a to #a8683f
+  shadow = color.mix(base, #4a2414, 0.55)
+}
+
+// Sealing wax of the neck seal; the seal mixes in a little of the liquid.
+material Wax {
+  base = #902d42 to #c85c4e with beta(alpha = 3.0, beta = 2.0)
+  shadow = color.mix(base, #752c3c, 0.65)
+  light = color.mix(base, #efaf88, 0.58)
+}
+
+// Folded apothecary paper.
+material Paper {
+  base = #d0b682 to #dcc490
+  deep = color.mix(base, #2a1c10, 0.72)
+  light = color.mix(base, #fff6d8, 0.72)
+}
+
+// The small brass assay medallion.
+material Brass {
+  base = #8e6a40 to #9a7648
+  deep = color.mix(base, #1c120e, 0.75)
+  light = color.mix(base, #fff0c0, 0.78)
+}
+
+// The twine that ties a seal to the neck: a lit stitch over a dark wrap.
+material Twine {
+  light = #dccb9c to #ecdcae
+  deep = color.mix(light, #1a1418, 0.85)
+  base = color.mix(deep, light, 0.5)
+}
+
+// Parchment labels on the glass: paper, its edge and the ink of the writing.
+material Parchment {
+  base = #e2d4a4 to #efe2b8 with gaussian(mean = 0.5, sigma = 0.2)
+  edge = color.mix(base, #2e2412, 0.68)
+  ink = color.mix(base, #241a0c, 0.82)
+}
+
+// Gilded belts, rune dots and gold leaf.
+material Gold {
+  base = #84661c to #947424
+  deep = color.mix(base, #241a06, 0.45)
+  light = color.mix(base, #fff07a, 0.85)
+  glint = color.mix(light, #ffffc8, 0.6)
+}
+
+// Symbols etched into the glass: a pale cut with a dark rim.
+material Etching {
+  base = #e8dcb4 to #f2e8c8
+  rim = color.mix(base, #0c0804, 0.92)
+}

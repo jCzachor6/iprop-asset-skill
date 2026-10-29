@@ -1,0 +1,131 @@
+// cork.ips — the potion stopper.
+// Paints absolute 64x64 coordinates; the root passes position and size.
+// Styles: 0 classic cork, 1 wax seal, 2 metal cap, 3 gem stopper,
+//         4 cloth-wrapped cork, 5 flat stopper, 6 crown cap, 7 big cork.
+// Cork, pewter, slate and cloth come from the potion's material library;
+// the wax seal and the gem take their colour from the liquid.
+
+import mats from "materials.ips"
+
+asset Cork {
+  size 64x64
+  origin 0, 0
+
+  input u32 style = 0
+  input f32 cx = 32.0
+  input f32 base = 24.0
+  input f32 w = 4.5
+  input f32 h = 6.0
+  input color liquid = #d0403a
+
+  draw {
+    liquid_scaleTones = scaleSteps(liquid)
+    liquid_ffffffTones = tintSteps(liquid, #ffffff)
+    top = base - h
+    // Every material is created, whatever the style, so a style never
+    // shifts the draws after it. Each cork has its own tone of bark; a big
+    // cork is a paler one, and its light and shade follow its base.
+    corkLook = mats.Cork()
+    if (style == 7) { corkLook = mats.Cork(base = color.mix(corkLook.base, #a8743a, 0.35)) }
+    pewter = mats.Pewter()
+    slate = mats.Slate()
+    clothLook = mats.Cloth()
+    outline = mats.Outline()
+    edge = outline.base
+    cork = corkLook.base
+    corkTones = materialTones(corkLook.shadow, cork, corkLook.light)
+    corkD = corkTones[0]
+    corkL = corkTones[4]
+    metalTones = materialTones(pewter.shadow, pewter.base, pewter.light)
+    metalD = metalTones[0]
+    metal = metalTones[2]
+    metalL = metalTones[4]
+    flatTones = materialTones(slate.shadow, slate.base, slate.light)
+    clothTones = stepper(clothLook.shadow to clothLook.base).pick(3)
+
+    if (style == 0 || style == 4 || style == 7) {
+      corkBody(cx, top, w, h, cork, corkL, corkD, edge)
+      spots = 1 to 2
+      for i in 0..spots {
+        sx = int(cx - w + 1.0) to int(cx + w - 1.0)
+        sy = int(top) + 2 to max(int(top) + 2, int(base) - 1)
+        pixel(sx, sy, corkD)
+      }
+      if (style == 4) {
+        cloth = clothTones[2]
+        clothD = clothTones[0]
+        rect(cx - w - 1.0, base - 4.6, (w + 1.0) * 2.0, 3.2, clothD)
+        rect(cx - w - 0.6, base - 4.2, (w + 0.6) * 2.0, 2.4, cloth)
+        oval(cx + w + 0.3, base - 3.2, 1.5, 1.5, cloth)
+        poly(clothD, cx + w - 0.5, base - 2.2, cx + w + 2.5, base + 1.6, cx + w + 3.4, base - 0.6)
+        poly(cloth, cx + w - 1.0, base - 1.7, cx + w + 1.4, base + 2.0, cx + w + 2.6, base + 0.4)
+      }
+    } else if (style == 1) {
+      waxD = lightStep(liquid_scaleTones, 0.55)
+      wax = lightStep(liquid_ffffffTones, 0.1)
+      waxL = lightStep(liquid_ffffffTones, 0.5)
+      oval(cx, base - 1.2, w + 1.8, 2.6, waxD)
+      oval(cx, base - 1.6, w + 1.2, 2.1, wax)
+      oval(cx - w * 0.35, base - 2.4, w * 0.55, 0.9, waxL)
+      oval(cx - w * 0.75, base + 1.8, 1.2, 1.9, wax)
+      oval(cx + w * 0.6, base + 2.6, 0.9, 1.6, wax)
+    } else if (style == 2) {
+      rect(cx - w - 0.8, top - 0.5, (w + 0.8) * 2.0, h + 1.2, metalD)
+      rect(cx - w, top, w * 2.0, h, metal)
+      oval(cx, top + 0.9, w, 1.7, metalL)
+      rect(cx - w, base - 1.8, w * 2.0, 1.8, metalD)
+      rect(cx - w + 1.0, top + 2.2, 1.4, h - 3.4, metalL)
+    } else if (style == 3) {
+      // gem stopper
+      rect(cx - w * 0.8, base - 2.0, w * 1.6, 2.4, metalD)
+      rect(cx - w * 0.65, base - 2.0, w * 1.3, 1.6, metal)
+      gem = lightStep(liquid_ffffffTones, 0.25)
+      gemL = lightStep(liquid_ffffffTones, 0.65)
+      gemD = lightStep(liquid_scaleTones, 0.5)
+      poly(gem, cx, top, cx + w, top + h * 0.42, cx, base - 0.5, cx - w, top + h * 0.42)
+      poly(gemL, cx, top + 0.6, cx + w * 0.45, top + h * 0.44, cx, top + h * 0.66)
+      poly(gemD, cx, top + 0.6, cx - w * 0.45, top + h * 0.44, cx, top + h * 0.66)
+    } else if (style == 5) {
+      rect(cx - w - 0.6, top - 0.4, (w + 0.6) * 2.0, h + 1.0, flatTones[0])
+      rect(cx - w, top, w * 2.0, h, flatTones[2])
+      oval(cx, top + 0.8, w, 1.5, flatTones[4])
+      rect(cx - w, base - 1.4, w * 2.0, 1.4, flatTones[1])
+    } else if (style == 6) {
+      // crown cap
+      rect(cx - w - 0.5, top - 0.5, (w + 0.5) * 2.0, h + 1.0, metalD)
+      rect(cx - w, top, w * 2.0, h, metal)
+      oval(cx, top + 0.9, w, 1.6, metalL)
+      for i in 0..5 {
+        x0 = cx - w + float(i) * (w * 0.4)
+        poly(metalD, x0, base - 1.4, x0 + w * 0.2, base + 1.6, x0 + w * 0.4, base - 1.4)
+      }
+    }
+  }
+
+  // Classic rounded cork body.
+  corkBody(ox: f32, oy: f32, ww: f32, hh: f32, main: color, lite: color, shad: color, edge: color) {
+    oval(ox, oy + 0.5, ww + 1.0, 2.6, edge)
+    rect(ox - ww - 1.0, oy, (ww + 1.0) * 2.0, hh + 1.0, edge)
+    oval(ox, oy + 0.8, ww, 2.2, lite)
+    rect(ox - ww, oy + 1.0, ww * 2.0, hh - 0.5, main)
+    rect(ox - ww, oy + hh - 1.2, ww * 2.0, 2.0, shad)
+    rect(ox - ww + 1.0, oy + 2.0, 1.5, hh - 4.0, lite)
+  }
+  // These immutable ramps are built once per material in a painting helper.
+  scaleSteps(base: color) -> list<color> {
+    return stepper(color.set.a(#000000, base.a) to base).pick(17)
+  }
+  tintSteps(base: color, target: color) -> list<color> {
+    return stepper(base to color.set.a(target, base.a)).pick(17)
+  }
+  lightStep(tones: list<color>, position: f32) -> color {
+    return tones[clamp(round(position * 16.0), 0, 16)]
+  }
+
+  materialTones(dark: color, base: color, light: color) -> list<color> {
+    shadows = stepper(dark to base).pick(3)
+    highlights = stepper(base to light).pick(3)
+    return [shadows[0], shadows[1], base, highlights[1], highlights[2]]
+  }
+
+}

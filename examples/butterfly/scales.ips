@@ -1,0 +1,25 @@
+// scales.ips: a 40x40 tile of wing-scale texture, exported as a mask.
+//
+// Every pixel draws its own coverage from a hash, squared so most scales
+// stay quiet and a few stand out dark. Uncorrelated pixels tile
+// without seams, so wing.ips lays this tile edge to edge across each wing
+// with mask.offset, which moves the view without copying or redrawing it.
+
+asset ButterflyScales {
+  size 40x40
+  origin 0,0
+  output mask dark
+
+  draw {
+    key = hash(seed)
+    layer shade(alpha=surface.source_over) {
+      for y in 0..40 {
+        for x in 0..40 {
+          h = hash(key ^ (x * 73856093) ^ (y * 19349663)) & 255
+          pixel(x, y, rgba(255, 255, 255, (h * h) >> 8))
+        }
+      }
+    }
+    dark = mask.from(shade)
+  }
+}

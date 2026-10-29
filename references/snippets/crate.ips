@@ -1,0 +1,98 @@
+// crate.ips — every snippet of references/language.md in one asset that compiles and renders.
+// `node --test scripts/test` compiles it with the SDK, so the snippets stay valid.
+import looks from "looks.ips"
+import band from "parts/band.ips"
+
+asset Crate {
+  size 32x32
+  origin 16, 30
+  input u32 kind = 0               // 0 rolls; 1 plain, 2 banded
+  input color tint = #00000000     // transparent rolls one
+  output point anchor
+  output rect collider
+  output list point rivets
+
+  const distribution typical = gaussian(mean = 0.5, sigma = 0.18)
+  const distribution kinds = weighted {1: 60, 2: 40}
+  const sampler<f32> wobble = sampler(-1.0 to 1.0 with gaussian(mean = 0.0, sigma = 0.5))
+  const list<vec2> chip = [{14, 27}, {18, 27}, {16, 29}]
+  palette stains = [#3a2a1a, #2a2a22, #4a3020]
+  // Stream keys, one per purpose: hash(start ^ key) seeds that purpose's stream.
+  const i32 kindKey = 0x2f6b9a13
+  const i32 shapeKey = 0x51ed2701
+  const i32 colorKey = 0x6c8e9cf5
+  const i32 bandKey = 0x85ebca6b
+
+  draw {
+    start = seed                     // the game's seed, before any draw moves it
+    // Hashed choice: a rolled kind renders exactly like the same kind forced.
+    look = clamp(kind, 0, 2)
+    if (look == 0) {
+      stream_push(hash(start ^ kindKey))
+      look = 1 to 2 with kinds
+      stream_pop()
+    }
+
+    // Shape: its own stream, every roll whatever the kind.
+    stream_push(hash(start ^ shapeKey))
+    half = lerp(8.0, 13.0, 0.0 to 1.0 with typical)
+    tall = lerp(12.0, 22.0, 0.0 to 1.0 with typical)
+    lean = -1.0 to 1.0 with gaussian(mean = 0.0, sigma = 0.4)
+    planks = 2 to 4
+    damaged = chance(0.25)
+    stainX = wobble.pick() * 3.0
+    stream_pop()
+
+    // Colours: a material (rolled once), an override, palette picks.
+    stream_push(hash(start ^ colorKey))
+    wood = looks.Wood()
+    iron = looks.Iron()
+    stain = stains[index(3)]
+    grain = pick(1, 2, 2, 3)
+    stream_pop()
+    if (tint.a != 0) { wood = looks.Wood(base = color.set.a(tint, 255)) }
+    tones = stepper(wood.shadow to wood.light).pick(5)
+
+    // Draw once into a layer, outline it from its mask, paint it.
+    top = 30.0 - tall
+    layer body(alpha = surface.source_over) {
+      for r in 0..int(tall) {
+        t = float(r) / tall
+        x = 16.0 - half + lean * (1.0 - t)
+        rect(x, top + float(r), half, 1.0, tones[3])
+        rect(x + half, top + float(r), half, 1.0, tones[1])
+      }
+      for p in 1..planks {
+        y = top + tall * float(p) / float(planks)
+        line(16.0 - half, y, 16.0 + half, y, 1, tones[0])
+      }
+      if (damaged) { poly(chip, stain) }
+    }
+    surface.paint(mask.expand(mask.from(body), 1), wood.edge, blend = surface.source_over)
+    surface.paint(body, blend = surface.source_over)
+    clip(mask.from(body)) { oval(16.0 + stainX, top + 3.0, 3.0, 1.0, color.mix(stain, tones[2], 0.5)) }
+
+    // A part: placed by its origin, read right after the call, mirrored with mirror_x.
+    if (look == 2) {
+      band.draw(hash(start ^ bandKey), at = {16.0, top + tall * 0.5}, half = half, iron = iron.base)
+      rivets = band.outputs.rivet
+      band.draw(hash(start ^ bandKey), at = {16.0, top + tall * 0.5}, half = half, iron = iron.base, mirror_x = 1)
+      rivets = band.outputs.rivet
+    }
+    shadowLayer()
+
+    anchor = {16.0, 30.0}
+    collider = {16.0 - half - 1.0, top - 1.0, half * 2.0 + 2.0, tall + 1.0}
+  }
+
+  // Helpers see palettes, constants and seed; inputs travel as parameters.
+  shade(base: color, steps: i32) -> color {
+    return color.shade(base, steps)
+  }
+
+  // A translucent shadow survives only when painted with source-over; the root canvas is legacy.
+  shadowLayer() {
+    layer shadow(alpha = surface.source_over) { oval(16.0, 30.5, 12.0, 1.5, #00000060) }
+    surface.paint(shadow, blend = surface.source_over)
+  }
+}

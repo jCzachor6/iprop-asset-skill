@@ -1,0 +1,56 @@
+// materials.ips — the looks the shield's features share: the wood of the
+// board, the metal of plates, rims and bosses, the rawhide of a rim and the
+// paint of a field or an emblem. Every material has the same five tones, from
+// `deep` to `shine`, and an `edge` for the outline. Each tone follows the rolled
+// (or passed) base: shadows lean cool, lights warm, as the light comes from
+// the upper left.
+
+// Wood families: pale ash, oak, dark walnut, weathered grey, red-stained.
+palette woods = [#9a7a50 to #b8966a, #7a5232 to #98683e, #523626 to #6c4a34, #6a6254 to #847a68, #6e3a28 to #8a4c34]
+const distribution woodFamilies = weighted {0: 26, 1: 36, 2: 18, 3: 12, 4: 8}
+
+// Metal families: iron, dark iron, bronze, brass, copper, silver, gold.
+palette metals = [#737b84 to #959da6, #4e545c to #666c74, #9c7234 to #b88c46, #a08a44 to #bca45a, #925438 to #ac6844, #a8b0b8 to #c4cad0, #b89430 to #d4b048]
+const distribution metalFamilies = weighted {0: 38, 1: 16, 2: 18, 3: 12, 4: 6, 5: 6, 6: 4}
+
+const distribution typical = gaussian(mean = 0.5, sigma = 0.22)
+
+// The boards of a wooden shield.
+material Wood {
+  base = woods[0 to 4 with woodFamilies].pick()
+  deep = color.mix(base, #1a1426, 0.58)
+  shadow = color.mix(base, #2a2438, 0.3)
+  light = color.mix(base, #ffe6b0, 0.2)
+  shine = color.mix(base, #fff2cc, 0.38)
+  edge = color.mix(base, #0c0a10, 0.8)
+}
+
+// Forged metal: a plate, a rim band or a boss.
+material Metal {
+  base = metals[0 to 6 with metalFamilies].pick()
+  deep = color.mix(base, #10141e, 0.6)
+  shadow = color.mix(base, #222a40, 0.3)
+  light = color.mix(base, #fff2d6, 0.32)
+  shine = color.mix(base, #fffbee, 0.68)
+  edge = color.mix(base, #08090e, 0.8)
+}
+
+// Rawhide stretched over a wooden rim.
+material Hide {
+  base = #7c5c3e to #9a7850 with typical
+  deep = color.mix(base, #1a1220, 0.55)
+  shadow = color.mix(base, #2a2030, 0.28)
+  light = color.mix(base, #ffe8bc, 0.22)
+  shine = color.mix(base, #fff4d8, 0.4)
+  edge = color.mix(base, #0c0a0e, 0.8)
+}
+
+// Paint on a field or an emblem; the base is always passed in.
+material Paint {
+  base = #9a2a24
+  deep = color.mix(base, #120c1c, 0.52)
+  shadow = color.mix(base, #221a34, 0.28)
+  light = color.mix(base, #fff0c8, 0.18)
+  shine = color.mix(base, #fff8e4, 0.34)
+  edge = color.mix(base, #0a080e, 0.8)
+}

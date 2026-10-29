@@ -1,0 +1,201 @@
+// body.ips: the butterfly's body seen from above. It has a hairy thorax, a
+// head with compound eyes and palps, and a tapering, segmented abdomen.
+//
+// The hair is drawn first into a captured layer and softened with a Gaussian
+// blur; the crisp shapes are painted over it. Every shape is centred on the
+// body axis (local x = 20, root x = 128) or drawn as a mirrored pair. The
+// root draws it once, over both wings, with the wing part's sizes and colour
+// scheme; the hair colour hashes the same seed as wing.ips.
+
+asset ButterflyBody {
+  size 40x150
+  origin 20,36
+  input u32 style = 1
+  input f32 fore = 100.0
+  input f32 hind = 70.0
+  input f32 thorax = 0.13
+  input f32 abdomen = 0.74
+  // The wings' colour scheme, applied to the hair, shell and marks.
+  input f32 hue = 0.0
+  input f32 saturation = 1.0
+  input f32 value = 1.0
+  input f32 lift = 0.0
+  input f32 sink = 0.0
+
+  // Per style (index style - 1), as in wing.ips.
+  palette hairs = [#1a1210 to #3a2a20, #1a1810 to #3a3220, #2a2018 to #5a4434,
+                   #8a8478 to #c8c2b2, #3a2418 to #6a4430, #2a201a to #4a3a2e,
+                   #120e0e to #2a2222, #6a5034 to #a8865c, #6a7088 to #a8b0c8,
+                   #141a16 to #2c3a30, #3a2a20 to #6a5040, #4a3828 to #7a6048,
+                   #4a2a18 to #7a4a2a]
+  palette bodies = [#100c0c to #241c1a, #121010 to #262220, #2a2018 to #4a3a2a,
+                    #26262a to #46464a, #2a1a14 to #4a3024, #1a1412 to #342a24,
+                    #0e0c0c to #201a1a, #3a2818 to #5a4228, #2a2c38 to #4a4e60,
+                    #0c120e to #1c2620, #2a1e18 to #4a3628, #34281c to #54422e,
+                    #2a1a10 to #4a2e1c]
+  palette marks = [#f4f0e6, #f2d860, #c8b498, #e8e4da, #c89060, #e8dcc8,
+                   #f2d040, #e0b070, #d8dcf0, #50d090, #f0ece4, #c8a878,
+                   #f08a40]
+  palette eyeTones = [#1a1410 to #3a2c1c, #2a2418 to #5a4a2c, #1c1a14 to #3e3426]
+
+  // Stream keys. hairKey matches wing.ips, so the wings and the body roll one
+  // hair colour from the same seed.
+  const i32 hairKey = 0x6c62272e
+  const i32 bodyKey = 0x7f4a7c15
+  // Fixed streams of the hair strands, the same on every butterfly: only
+  // their reach and colours follow the seed.
+  const i32 thoraxTuftKey = 0x243f6a88
+  const i32 abdomenTuftKey = 0x13198a2e
+  const i32 headTuftKey = 0x452821e6
+  const i32 thoraxHairKey = 0x3c6ef372
+  const i32 headHairKey = 0x2a7d1f39
+
+  draw {
+    look = clamp(int(style), 1, 13)
+    stream_push(hash(seed ^ hairKey))
+    coat = recolor(hairs[look - 1].pick(), hue, saturation * 0.8, value, lift * 0.6, sink)
+    stream_pop()
+
+    stream_push(hash(seed ^ bodyKey))
+    distribution typical = gaussian(mean=0.5, sigma=0.18)
+    shell = recolor(bodies[look - 1].pick(), hue, saturation, value, lift * 0.6, sink)
+    eyeBase = eyeTones[index(3)].pick()
+    mark = recolor(color.mix(marks[look - 1], #ffffff, 0.0 to 0.2), hue + 0.5, saturation, value, lift * 0.6, 0.0)
+    girth = 1.45 to 1.95 with gaussian(1.7, 0.1)
+    waist = 0.62 to 0.82 with gaussian(0.72, 0.05)
+    segments = 8 to 10
+    marked = chance(0.6)
+    if (look == 1 || look == 2 || look == 7) { marked = 1 }
+    stream_pop()
+
+    cx = 20.0
+    cy = 36.0
+    thH = max(5.0, thorax * fore * 0.72)
+    thW = thH * girth
+    headR = max(2.5, fore * 0.045)
+    headY = cy - thH - headR * 0.75
+    abTop = cy + thH * 0.8
+    abLen = max(12.0, abdomen * hind)
+    abW = thW * waist
+    light = color.mix(coat, #f4ecd8, 0.25)
+
+    // ---- soft hair: a captured layer, blurred, then painted under the body
+    layer fuzz(alpha=surface.source_over) {
+      curve({cx, cy - thH * 0.55}, {cx, cy}, {cx, cy + thH * 0.6}, thW * 1.08, coat)
+      curve({cx, abTop}, {cx, abTop + abLen * 0.4}, {cx, abTop + abLen * 0.78}, abW * 0.95,
+            color.set.a(color.mix(coat, shell, 0.6), 190))
+      dot({cx, headY}, headR * 2.3, coat)
+      tufts = stepper(color.shade(coat, -12) to light).pick(6)
+      strands(cx, cy - thH * 0.1, thW * 0.5, thH * 0.95, 200, tufts, 2.0, 6.0, thoraxTuftKey)
+      strands(cx, abTop + abLen * 0.35, abW * 0.45, abLen * 0.45, 130, tufts, 1.5, 4.5, abdomenTuftKey)
+      strands(cx, headY, headR * 0.8, headR * 0.8, 50, tufts, 1.5, 3.5, headTuftKey)
+    }
+    surface.paint(fuzz.blur(1.1), blend=surface.source_over)
+
+    // ---- abdomen: a smooth tapering column, lit along its back ------------
+    // Stepped positions along the abdomen; the half-width swells just below
+    // the thorax and tapers to a rounded tip.
+    steps = stepper(0.0 to 1.0).pick(18)
+    shadeSteps = stepper(color.shade(shell, -12) to color.mix(shell, coat, 0.45)).pick(4)
+    for layerIndex in 0..4 {
+      scale = 1.0 - float(layerIndex) * 0.2
+      for i in 0..18 {
+        t = steps[17 - i]
+        w = girthAt(t) * abW * 0.5 * scale
+        y = abTop + t * abLen - float(layerIndex) * 0.4
+        dot({cx, y}, max(1.2, w * 2.0), shadeSteps[layerIndex])
+      }
+    }
+    curve({cx, abTop + abLen * 0.05}, {cx, abTop + abLen * 0.45}, {cx, abTop + abLen * 0.85},
+          max(0.9, abW * 0.16), color.set.a(#ffffff, 30))
+    for k in 1..segments {
+      t = float(k) / float(segments)
+      w = girthAt(t) * abW * 0.46
+      y = abTop + t * abLen
+      curve({cx - w, y - 0.6}, {cx, y + 0.8}, {cx + w, y - 0.6}, 0.8, color.set.a(color.shade(shell, -24), 70))
+      if (marked == 1) {
+        dot({cx - w * 0.86, y - 1.2}, max(1.0, abW * 0.13), color.set.a(mark, 200))
+        dot({cx + w * 0.86, y - 1.2}, max(1.0, abW * 0.13), color.set.a(mark, 200))
+      }
+    }
+
+    // ---- thorax: shaded hair mass with a lighter collar and tufts -------------
+    shades = stepper(color.shade(coat, -18) to color.mix(coat, light, 0.35)).pick(5)
+    sizes = stepper(thW * 0.30 to thW * 0.92).pick(5)
+    for i in 0..5 {
+      s = sizes[4 - i]
+      curve({cx, cy - thH * 0.5 - s * 0.1}, {cx, cy - s * 0.15}, {cx, cy + thH * 0.55 - s * 0.2}, s,
+            color.set.a(shades[i], 120))
+    }
+    hairTones = stepper(color.shade(coat, -20) to color.mix(light, #ffffff, 0.2)).pick(6)
+    strands(cx, cy - thH * 0.05, thW * 0.42, thH * 0.85, 120, hairTones, 1.5, 4.0, thoraxHairKey)
+    curve({cx - thW * 0.30, cy - thH * 0.72}, {cx, cy - thH * 0.84}, {cx + thW * 0.30, cy - thH * 0.72},
+          max(1.2, thH * 0.22), color.set.a(light, 180))
+    // Tegulae: the hair tufts that cover the wing bases on both sides.
+    tuft = color.set.a(color.mix(coat, light, 0.5), 200)
+    curve({cx - thW * 0.30, cy - thH * 0.45}, {cx - thW * 0.52, cy - thH * 0.1}, {cx - thW * 0.36, cy + thH * 0.3},
+          max(1.4, thW * 0.24), tuft)
+    curve({cx + thW * 0.30, cy - thH * 0.45}, {cx + thW * 0.52, cy - thH * 0.1}, {cx + thW * 0.36, cy + thH * 0.3},
+          max(1.4, thW * 0.24), tuft)
+    if (marked == 1 && (look == 1 || look == 7)) {
+      dot({cx - thW * 0.22, cy - thH * 0.55}, max(1.0, thH * 0.18), mark)
+      dot({cx + thW * 0.22, cy - thH * 0.55}, max(1.0, thH * 0.18), mark)
+    }
+    if (look == 2) {
+      dash({cx - thW * 0.36, cy - thH * 0.6}, {cx - thW * 0.30, cy + thH * 0.5}, max(1.0, thW * 0.1), color.set.a(mark, 200))
+      dash({cx + thW * 0.36, cy - thH * 0.6}, {cx + thW * 0.30, cy + thH * 0.5}, max(1.0, thW * 0.1), color.set.a(mark, 200))
+    }
+
+    // ---- head: hairy crown, compound eyes with a glint, upturned palps -------
+    dot({cx, headY}, headR * 1.85, color.shade(coat, -8))
+    palp = color.mix(coat, light, 0.4)
+    curve({cx - headR * 0.22, headY - headR * 0.5}, {cx - headR * 0.30, headY - headR * 1.1},
+          {cx - headR * 0.24, headY - headR * 1.7}, max(1.0, headR * 0.42), palp)
+    curve({cx + headR * 0.22, headY - headR * 0.5}, {cx + headR * 0.30, headY - headR * 1.1},
+          {cx + headR * 0.24, headY - headR * 1.7}, max(1.0, headR * 0.42), palp)
+    eye(cx - headR * 0.68, headY + headR * 0.05, headR * 0.62, eyeBase, -1.0)
+    eye(cx + headR * 0.68, headY + headR * 0.05, headR * 0.62, eyeBase, 1.0)
+    strands(cx, headY - headR * 0.2, headR * 0.45, headR * 0.5, 24, hairTones, 1.0, 2.5, headHairKey)
+  }
+
+  // The abdomen's half-width profile: it swells below the thorax and
+  // tapers to a rounded tip.
+  girthAt(t: f32) -> f32 {
+    return (0.78 + 0.32 * sin(3.1416 * clamp(t * 1.4, 0.0, 1.0))) * pow(1.0 - t * 0.92, 0.5)
+  }
+
+  recolor(c: color, hue: f32, sat: f32, val: f32, lift: f32, sink: f32) -> color {
+    d = color.hsv(c, hue, sat, val)
+    d = color.mix(d, #ffffff, lift)
+    d = color.mix(d, #000000, sink)
+    return color.set.a(d, c.a)
+  }
+
+  dot(p: vec2, d: f32, c: color) { curve(p, p, p, d, c) }
+
+  dash(a: vec2, b: vec2, d: f32, c: color) { curve(a, (a + b) * 0.5, b, d, c) }
+
+  // Mirrored hair strands around an ellipse of half-sizes rx, ry.
+  strands(cx: f32, cy: f32, rx: f32, ry: f32, count: i32, tones: list<color>, shortest: f32, longest: f32, key: i32) {
+    stream_push(key)
+    for i in 0..count {
+      a = -3.1416 to 3.1416
+      d = {cos(a), sin(a)}
+      rim = {d.x * rx, d.y * ry} * (0.55 to 0.95)
+      len = shortest to longest with gaussian((shortest + longest) * 0.45, (longest - shortest) * 0.25)
+      tip = rim + d * len + {0.0, -0.4 to 0.6}
+      c = color.set.a(tones[index(list.len(tones))], 90 to 210)
+      dash({cx + rim.x, cy + rim.y}, {cx + tip.x, cy + tip.y}, 0.7, c)
+      dash({cx - rim.x, cy + rim.y}, {cx - tip.x, cy + tip.y}, 0.7, c)
+    }
+    stream_pop()
+  }
+
+  eye(x: f32, y: f32, r: f32, base: color, side: f32) {
+    shells = stepper(color.shade(base, -14) to color.shade(base, 26)).pick(4)
+    radii = stepper(r * 0.9 to r * 2.0).pick(4)
+    for i in 0..4 { dot({x, y}, radii[3 - i], shells[i]) }
+    dot({x + side * r * 0.22, y - r * 0.34}, max(0.9, r * 0.5), #ffffff40)
+    dot({x + side * r * 0.30, y - r * 0.42}, max(0.6, r * 0.2), #ffffffb0)
+  }
+}

@@ -1,0 +1,272 @@
+// Eight guard constructions, six pommels and four coordinated ornaments.
+// The material and emission passes evaluate exactly the same gemstones.
+// soldier 1: plain forged bars and pommels without chasing or stones; the
+// hilt then emits nothing.
+
+import mats from "materials.ips"
+
+asset SwordHilt {
+  size 96x96
+  // 1 lights the gemstones.
+  input u32 lit = 0
+
+  input f32 cx = 60.5
+  input f32 cy = 60.5
+  input f32 reach = 13.0
+  input u32 style = 0
+  input f32 gripLength = 14.0
+  input u32 pommel = 0
+  input u32 ornament = 0
+  input color metal = #b89a56
+  input color leather = #56323a
+  input color stone = #426879
+  input color magic = #bd69ff
+  input u32 power = 2
+  input u32 renderPass = 0
+  input u32 soldier = 0
+
+  // Stream key of the braid's phase: hash(seed ^ braidKey).
+  const i32 braidKey = 0x9e3779b9
+
+  draw {
+    metal_fff0ccTones = tintSteps(metal, #fff0cc)
+    metal_f3e0b8Tones = tintSteps(metal, #f3e0b8)
+    metal_scaleTones = scaleSteps(metal)
+    leather_c7a482Tones = tintSteps(leather, #c7a482)
+    leather_scaleTones = scaleSteps(leather)
+    ink = #17171c
+    mLight = lightStep(metal_fff0ccTones, 0.68)
+    mMid = lightStep(metal_f3e0b8Tones, 0.20)
+    mDark = lightStep(metal_scaleTones, 0.48)
+    mDeep = lightStep(metal_scaleTones, 0.27)
+    lLight = lightStep(leather_c7a482Tones, 0.27)
+    lDark = lightStep(leather_scaleTones, 0.48)
+    sc = -(gripLength + 7.2)
+    socket = #24232a
+    // A gem's tones follow the stone it is cut from; a lit gem is cut from
+    // the enchantment and shines brighter with more power. Each override
+    // reads the unlit gem it replaces.
+    gemBase = stone
+    if (lit == 1) { gemBase = magic }
+    gem = mats.Gem(base = gemBase)
+    if (lit == 1) {
+      if (power == 1) {
+        gem = mats.Gem(base = gemBase, light = color.scale(color.mix(gemBase, #ffffff, 0.52), 0.80),
+                       mid = color.scale(gem.mid, 0.78), shade = color.scale(gem.shade, 0.78))
+      } else if (power == 3) {
+        gem = mats.Gem(base = gemBase, light = color.mix(gemBase, #ffffff, 0.70), mid = color.mix(gemBase, #ffffff, 0.30))
+      } else if (power == 4) {
+        gem = mats.Gem(base = gemBase, light = color.mix(gemBase, #ffffff, 0.78), mid = color.mix(gemBase, #ffffff, 0.45))
+      } else {
+        gem = mats.Gem(base = gemBase, light = color.mix(gemBase, #ffffff, 0.62))
+      }
+    }
+    gemLight = gem.light
+    gemShade = gem.shade
+    gemMid = gem.mid
+    gemTones = facetTones(gemShade, gemBase, gemLight)
+    gemShade = gemTones[0]
+    gemMid = gemTones[3]
+    gemLight = gemTones[6]
+    braidPhase = roll(hash(seed ^ braidKey), 0.0, 3.0)
+    guardWidth = reach + 0.8
+    if (style == 3) { guardWidth = reach + 1.9 }
+    if (style == 6) { guardWidth = max(guardWidth, 11.2) }
+    strip = int(ceil(max(guardWidth, 5.8) * 1.41421356))
+    bottom = int(ceil(120.0 + (gripLength + 13.3) * 1.41421356))
+    guardBottom = -6.8
+    if (style == 6) { guardBottom = -gripLength - 6.5 }
+
+    for y in 40..89 {
+      xmin = int(max(40, max(y - strip, 105 - y)))
+      xmax = int(min(89, min(y + strip + 1, bottom - y)))
+      for x in xmin..xmax {
+        dx = float(x) + 0.5 - cx
+        dy = float(y) + 0.5 - cy
+        s = -(dx + dy) * 0.70710678
+        u = (dx - dy) * 0.70710678
+        g = 100.0
+        r = 100.0
+        p = 100.0
+        if (abs(u) <= guardWidth && s > guardBottom && s < 9.5) {
+          g = guardDistance(u, s, reach, style, gripLength)
+        }
+        if (abs(u) < 4.0 && s < -1.3 && s > -gripLength - 5.0) {
+          r = max(abs(u) - 2.5, abs(s + 3.5 + gripLength * 0.5) - gripLength * 0.5)
+        }
+        if (abs(u) < 5.8 && abs(s - sc) < 5.7) { p = pommelDistance(u, s - sc, pommel) }
+        // Collars connect the wrapped grip to the guard and to the pommel.
+        collarTop = max(abs(u) - 3.2, abs(s + 3.3) - 1.4)
+        collarBot = max(abs(u) - 3.0, abs(s + gripLength + 3.5) - 1.3)
+        d = min(min(g, r), min(p, min(collarTop, collarBot)))
+        if (d <= 0.5) {
+          if (renderPass == 0) {
+            c = ink
+            if (d < -0.55) {
+              c = mMid
+              if (u > 0.8) { c = mDark }
+              if (u < -0.8) { c = mLight }
+              if (r < g && r < p && collarTop > -0.4 && collarBot > -0.4) {
+                c = leather
+                if (u < -0.5) { c = lLight }
+                if (u > 1.0) { c = lDark }
+                wrap = s * 0.92 + u * 0.65 + braidPhase
+                if (ornament == 1) { wrap = s * 1.15 + abs(u) * 0.8 + braidPhase }
+                if (ornament == 2) { wrap = u * 2.2 + sin(s * 0.28) * 0.45 }
+                if (ornament == 3) { wrap = s * 1.3 + u * 0.4 + braidPhase }
+                wrap = wrap - floor(wrap / 3.1) * 3.1
+                if (wrap < 0.6) { c = lDark }
+                else if (wrap < 1.1 && u < 0.8) { c = lLight }
+                if (abs(u) > 1.7) { c = lDark }
+              } else if (g <= r && g <= p) {
+                bend = guardBend(u, reach, style)
+                c = metal
+                if (s > bend + 0.25) { c = mLight }
+                if (s < bend - 0.65) { c = mDark }
+                if (s < bend - 1.25) { c = mDeep }
+                if (style == 6 && s < -3.0) {
+                  // A rim light keeps the curved hand protection legible.
+                  c = mMid
+                  if (u > 7.0) { c = mDark }
+                  if (u < 3.0 || (g > -1.5 && u < 5.0)) { c = mLight }
+                }
+                // Chased groove and bright raised beads on each quillon.
+                if (soldier == 0 && abs(u) > 4.0 && abs(u) < reach - 1.6) {
+                  if (abs(s - bend + 0.10) < 0.36) { c = mDark }
+                  bead = abs(u) - floor(abs(u) / 3.3) * 3.3
+                  if (bead < 0.8 && s > bend + 0.45) { c = mLight }
+                  if (ornament == 1 && bead > 1.1 && bead < 2.1 && abs(s - bend) < 0.6) { c = mDeep }
+                  if (ornament == 2 && abs(s - bend - sin(u * 0.65) * 0.6) < 0.3) { c = mLight }
+                  if (ornament == 3 && bead < 0.65 && s < bend + 0.6 && s > bend - 0.6) { c = mDeep }
+                }
+                // Faceted shield around the central stone (a plain block on a
+                // soldier's guard).
+                if (abs(u) * 0.82 + abs(s - 0.3) * 0.75 < 3.2) {
+                  c = mDark
+                  if (u < 0.0) { c = mLight }
+                }
+              } else if (p < g && p < r) {
+                c = metal
+                if (u < -0.2) { c = mLight }
+                if (u > 1.2) { c = mDark }
+                if (s - sc < -0.8) { c = mDeep }
+                if (p > -1.5 && u < 0.0) {
+                  c = #f7eaca
+                  if (soldier == 1) { c = mLight }
+                }
+              }
+              if (d > -1.3 && s > 0.0) { c = mLight }
+            }
+            pixel(x, y, c)
+          }
+
+          // The sockets belong to the colour sprite; only gem faces emit.
+          gemGuard = (abs(u) / 1.85 + abs(s - 0.25) / 2.65 - 1.0) * 1.85
+          gemPommel = (abs(u) / 1.65 + abs(s - sc) / 2.0 - 1.0) * 1.65
+          gd = min(gemGuard, gemPommel)
+          if (soldier == 1) { gd = 100.0 }
+          if (renderPass == 0 && gd < 0.55 && d < -0.6) { pixel(x, y, socket) }
+          if (gd < -0.15 && d < -0.9) {
+            c = gemMid
+            if (u < 0.0) { c = gemLight }
+            if (u > 0.8) { c = gemShade }
+            if (renderPass == 0 || lit == 1) { pixel(x, y, c) }
+          }
+        }
+      }
+    }
+  }
+
+  guardBend(u: f32, w: f32, k: i32) -> f32 {
+    t = abs(u) / w
+    if (k == 2) { return -0.5 - t * t * 4.6 }
+    if (k == 3 || k == 6) { return 0.0 }
+    if (k == 4) { return u / w * t * 4.6 }
+    if (k == 5) { return -0.5 + t * t * 3.6 }
+    if (k == 7) {
+      if (u < 0.0) { return -0.5 + t * t * 7.2 }
+      return -0.5 - t * t * 3.0
+    }
+    return -0.5 + t * t * 4.4
+  }
+
+  guardDistance(u: f32, s: f32, w: f32, k: i32, gl: f32) -> f32 {
+    t = clamp(abs(u) / w, 0.0, 1.0)
+    b = guardBend(u, w, k)
+    span = w
+    if (k == 6) { span = w * 0.72 }
+    if (k == 7 && u > 0.0) { span = w * 0.58 }
+    d = max(abs(s - b) - (2.6 - t * 1.5), abs(u) - span)
+    d = min(d, (abs(u) * 0.82 + abs(s - 0.3) * 0.75 - 4.0) * 0.85)
+    if (k == 1) {
+      // Open forked tips: the space between the tines stays transparent.
+      side = 1.0
+      if (u < 0.0) { side = -1.0 }
+      tine = dist.line({u, s}, {side * 5.5, 0.8}, {side * (w - 0.6), 7.0}) - 0.95
+      d = min(d, tine)
+    }
+    if (k == 3) {
+      // Solid faceted ends on a straight crossguard.
+      end = (abs(abs(u) - (w - 0.9)) + abs(s) * 0.72 - 2.0) * 0.82
+      d = min(d, end)
+    }
+    if (k == 5) {
+      // Feather-shaped wings are wider near their roots and pointed at the tips.
+      wing = max(abs(s - (0.8 + t * t * 6.5)) - max(0.65, (w - abs(u)) * 0.37),
+                 max(4.0 - abs(u), abs(u) - w))
+      d = min(d, wing)
+    }
+    if (k == 6 && u > 0.5 && u < 11.2) {
+      // A one-sided knuckle bow, connected to the top collar and pommel.
+      eu = (u - 3.2) / 6.2
+      es = (s + gl * 0.5 + 2.0) / (gl * 0.5 + 3.5)
+      ring = abs((sqrt(eu * eu + es * es) - 1.0) * 6.2) - 0.85
+      d = min(d, max(ring, 0.6 - u))
+    }
+    return d
+  }
+
+  pommelDistance(u: f32, s: f32, k: i32) -> f32 {
+    if (k == 0) { return (abs(u) / 3.7 + abs(s) / 4.7 - 1.0) * 3.7 }
+    if (k == 1) { return dist.circle({u, s}, {0, 0}, 3.6) }
+    if (k == 3) {
+      // Rounded shoulder over a long pointed acorn.
+      taper = max(abs(u) - max(0.0, 3.2 * (1.0 + s / 5.1)), max(-s - 5.1, s - 1.0))
+      return min(taper, dist.circle({u, s}, {0, 0.9}, 2.7))
+    }
+    if (k == 4) {
+      // An open wheel: the centre stays genuinely transparent.
+      radius = sqrt(u * u + s * s)
+      return max(radius - 4.5, 1.5 - radius)
+    }
+    if (k == 5) {
+      // A horned clasp, with a compact gemstone-bearing centre.
+      body = dist.circle({u, s}, {0, -0.5}, 2.8)
+      left = dist.line({u, s}, {-2.1, 0.5}, {-4.4, 3.7}) - 0.75
+      right = dist.line({u, s}, {2.1, 0.5}, {4.4, 3.7}) - 0.75
+      return min(body, min(left, right))
+    }
+    // Crown pommel with a pointed heel and two small shoulders.
+    body = (abs(u) / 4.4 + abs(s) / 3.4 - 1.0) * 3.4
+    return min(body, max(abs(u) - 1.2, abs(s + 1.6) - 3.3))
+  }
+  // These immutable ramps are built once per material in a painting helper.
+  scaleSteps(base: color) -> list<color> {
+    return stepper(color.set.a(#000000, base.a) to base).pick(17)
+  }
+  tintSteps(base: color, target: color) -> list<color> {
+    return stepper(base to color.set.a(target, base.a)).pick(17)
+  }
+  lightStep(tones: list<color>, position: f32) -> color {
+    return tones[clamp(round(position * 16.0), 0, 16)]
+  }
+
+  // Base is shared by the shadow and highlight steps of one material.
+  facetTones(dark: color, base: color, light: color) -> list<color> {
+    shadows = stepper(dark to base).pick(3)
+    highlights = stepper(base to light).pick(5)
+    return [shadows[0], shadows[1], base, highlights[1],
+            highlights[2], highlights[3], highlights[4]]
+  }
+
+}

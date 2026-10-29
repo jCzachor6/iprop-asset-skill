@@ -1,0 +1,141 @@
+// Plain iron crossbars, modest butt caps and worn wood/leather/cord grips.
+
+import mats from "materials.ips"
+
+asset PlainSwordHilt {
+  size 96x96
+  input f32 cx = 60.5
+  input f32 cy = 60.5
+  input f32 reach = 8
+  input u32 style = 0
+  input f32 gripLength = 13
+  input u32 gripStyle = 0
+  input u32 pommel = 0
+  input color iron = #777874
+  input color handle = #51412f
+  input f32 wear = 1.0
+  // 0 rolls; 1 blotches, 2 streaks, 3 speckles, 4..7 combinations, 8 none.
+  input u32 rust = 0
+  input u32 renderPass = 0
+
+  palette rustMasks = [1, 2, 4, 3, 5, 6, 7, 0]
+
+  const distribution rustMixture = weighted {1: 25, 2: 25, 3: 25, 4: 7, 5: 6, 6: 7, 7: 5}
+
+  // Stream keys: hash(seed ^ key) seeds one purpose.
+  const i32 rustKey = 0xb5297a4d
+  const i32 wearKey = 0x9e3779b9
+  const i32 phaseKey = 0x3c6ef372     // the phase of the grain and the winding
+
+  rustLayers(mode: i32) -> i32 {
+    stream_push(hash(seed ^ rustKey))
+    look = 1 to 7 with rustMixture
+    stream_pop()
+    if (mode >= 1 && mode <= 8) { look = mode }
+    return rustMasks[look - 1]
+  }
+
+  draw {
+    rustLook = mats.Rust()
+    iron_brightnessSteps = brightnessSteps(iron)
+    handle_brightnessSteps = brightnessSteps(handle)
+    layers = rustLayers(int(rust))
+    ink = #262723
+    metalSide = shadeLevel(iron_brightnessSteps, -17)
+    metalTop = shadeLevel(iron_brightnessSteps, 3)
+    woodLight = shadeLevel(handle_brightnessSteps, 7)
+    woodShade = shadeLevel(handle_brightnessSteps, -12)
+    wearLevel = clamp(wear, 0.0, 1.0)
+    rustThreshold = int(218.0 * wearLevel)
+    fleckThreshold = int(16.0 * wearLevel)
+    patchThreshold = 0.10 + (1.0 - wearLevel) * 0.48
+    sc = -(gripLength + 7.0)
+    wearSeed = hash(seed ^ wearKey)
+    phase = roll(hash(wearSeed ^ phaseKey), 0.0, 2.5)
+    strip = int(ceil((reach + 1.0) * 1.41421356))
+    bottom = int(ceil(120.0 + (gripLength + 11.3) * 1.41421356))
+
+    if (renderPass == 0) {
+      for y in 48..87 {
+        xmin = int(max(48, max(y - strip, 114 - y)))
+        xmax = int(min(87, min(y + strip + 1, bottom - y)))
+        for x in xmin..xmax {
+          dx = float(x) + 0.5 - cx
+          dy = float(y) + 0.5 - cy
+          s = -(dx + dy) * 0.70710678
+          u = (dx - dy) * 0.70710678
+          t = clamp(abs(u) / reach, 0.0, 1.0)
+          bar = 0.0
+          if (style == 1) { bar = t * t * 1.5 }
+          else if (style == 2) { bar = -t * t * 1.8 }
+          span = reach
+          if (style == 3) { span = reach * 0.68 }
+          g = max(abs(s - bar) - 1.35, abs(u) - span)
+          g = min(g, max(abs(u) - 2.4, abs(s + 0.3) - 2.0))
+          r = max(abs(u) - 2.05, abs(s + 3.5 + gripLength * 0.5) - gripLength * 0.5)
+          p = max(abs(u) - 2.4, abs(s - sc) - 2.7)
+          if (pommel == 1) { p = dist.circle({u, s}, {0, sc}, 2.85) }
+          else if (pommel == 2) {
+            p = (abs(u) / 2.6 + abs(s - sc) / 3.4 - 1.0) * 2.6
+          }
+          top = max(abs(u) - 2.5, abs(s + 3.3) - 1.0)
+          bot = max(abs(u) - 2.35, abs(s + gripLength + 3.5) - 1.0)
+          d = min(min(g, r), min(p, min(top, bot)))
+          if (d <= 0.5) {
+            col = ink
+            if (d < -0.5) {
+              col = iron
+              if (u > 0.5) { col = metalSide }
+              if (u < -0.5) { col = metalTop }
+              if (r < g && r < p && top > -0.3 && bot > -0.3) {
+                col = handle
+                if (u < -0.4) { col = woodLight }
+                if (u > 0.6) { col = woodShade }
+                if (gripStyle == 0) {
+                  grain = u * 1.7 + sin(s * 0.25 + phase) * 0.3
+                  grain = grain - floor(grain / 2.4) * 2.4
+                  if (grain < 0.45) { col = woodShade }
+                } else {
+                  winding = s * 0.95 + u * 0.4 + phase
+                  if (gripStyle == 2) { winding = s * 1.35 + u * 0.6 + phase }
+                  winding = winding - floor(winding / 3.0) * 3.0
+                  if (winding < 0.65) { col = woodShade }
+                }
+              } else {
+                // The same overlay selection continues onto the metal fittings.
+                speck = hash(wearSeed ^ (x * 73856093) ^ (y * 19349663)) & 255
+                patch = -1.0
+                if ((layers & 1) != 0) {
+                  patch = max(patch, 1.0 - abs(u + reach * 0.45) / 2.8 - abs(s - bar) / 1.8)
+                }
+                if ((layers & 2) != 0) {
+                  patch = max(patch, 1.0 - abs(s - sc) / 3.4 - abs(u) / 1.2)
+                }
+                if ((layers & 4) != 0 && speck < fleckThreshold) { patch = 1.0 }
+                if (patch > patchThreshold && speck < rustThreshold && d < -0.9) {
+                  col = rustLook.base
+                  if (patch > 0.48) { col = rustLook.deep }
+                  if (speck < 65) { col = rustLook.dry }
+                }
+              }
+            }
+            pixel(x, y, col)
+          }
+        }
+      }
+    }
+  }
+
+  // Material tones are deterministic; index 16 is the exact base colour.
+  brightnessSteps(base: color) -> list<color> {
+    shadows = stepper(color.shade(base, -80) to base).pick(17)
+    highlights = stepper(base to color.shade(base, 80)).pick(17)
+    return [shadows[0], shadows[1], shadows[2], shadows[3], shadows[4], shadows[5], shadows[6], shadows[7], shadows[8], shadows[9], shadows[10], shadows[11], shadows[12], shadows[13], shadows[14], shadows[15], base, highlights[1], highlights[2], highlights[3], highlights[4], highlights[5], highlights[6], highlights[7], highlights[8], highlights[9], highlights[10], highlights[11], highlights[12], highlights[13], highlights[14], highlights[15], highlights[16]]
+  }
+
+  shadeLevel(tones: list<color>, amount: i32) -> color {
+    return tones[clamp(16 + round(float(amount) * 0.2), 0, 32)]
+  }
+
+
+}

@@ -1,0 +1,19 @@
+// materials.ips — the looks __NAME__'s features share. Every tone follows the
+// rolled base, so any colour keeps a matching shadow, light and edge. Rename
+// them after what they are (Wood, Iron, Glass, Cloth) and add one per look.
+
+// The main look of the prop.
+material Main {
+  base = #6a7a8c to #9aaabb with gaussian(mean = 0.5, sigma = 0.2)
+  shadow = color.mix(base, #1a2238, 0.5)
+  light = color.mix(base, #fff2c8, 0.45)
+  edge = color.mix(base, #0c1018, 0.75)
+}
+
+// A second look for trims and details.
+material Accent {
+  base = #9a7a4a to #c8a060 with gaussian(mean = 0.5, sigma = 0.2)
+  shadow = color.mix(base, #2a1a10, 0.5)
+  light = color.mix(base, #fff6d0, 0.5)
+  edge = color.mix(base, #120c08, 0.75)
+}

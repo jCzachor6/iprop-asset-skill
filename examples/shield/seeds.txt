@@ -1,0 +1,15 @@
+# Seeds to compare across revisions. The first three also drive the input
+# checks of check-asset: seeds 2 and 3 carry paint, so `paint` is exercised.
+1-24
+# one of every family not above: tower 54, waisted 53, hex 39, kite 44, buckler 30
+54 53 39 44 30
+# one of every emblem design not above: saltire 33, chevron 92, quarterly 61,
+# bend 63, fess 28, ring 175, gyronny 37, pale 45
+33 92 61 63 28 175 37 45
+# the heaviest of seeds 1-600 (fuel near 417,000)
+117 182 99
+# seeds that once looked wrong: 2 (a pixel jutting from the round rim), 3 (a
+# silver chief striped like a fence), 9 (chevron hidden by the boss, then
+# silver on steel), 24 (a crowded buckler), 38 (a stem at the kite's point),
+# 49 (a gold boss on a gold plate)
+38 49

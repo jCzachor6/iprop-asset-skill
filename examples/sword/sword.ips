@@ -1,0 +1,333 @@
+// sword.ips — peasant, soldier and ornate inventory swords, authored at 96x96.
+// No bitmaps. Four parts draw the two characteristic features of a sword in
+// two qualities: blade.ips and hilt.ips for soldier and ornate swords,
+// plain-blade.ips and plain-hilt.ips for peasant ones. materials.ips holds
+// the steel, gem and rust they share.
+//
+// A seed alone gives a completely random sword: its quality, a coherent
+// construction (blade profile, guard, grip, pommel), its colours and its
+// enchantment. Enchant 1: ordinary metal, incised runes and unlit gemstones;
+// enchant 2: the same sword with luminous runes and gemstones. Soldier swords
+// are clean forged steel with a fuller and plain fittings; enchanted, only a
+// thin inlay in the fuller lights up. Peasant swords stay matte and unlit.
+// renderPass 0: transparent colour sprite; renderPass 1: transparent RGB
+// emission map. Generate both with the same seed and inputs.
+//
+// Variety: high
+
+import blade from "blade.ips"
+import hilt from "hilt.ips"
+import plainBlade from "plain-blade.ips"
+import plainHilt from "plain-hilt.ips"
+
+asset Sword {
+  size 96x96
+  // 0 rolls; 1 unlit, 2 luminous runes and gems.
+  input u32 enchant = 0
+
+  input color magic = #bd69ff
+  // 0: custom magic colour, 1: seeded palette, 2..25: fixed palette colour.
+  input u32 magicPalette = 1
+  // 0: seeded power; 1 subtle, 2 normal, 3 strong, 4 intense.
+  input u32 glowStrength = 0
+  input u32 renderPass = 0
+  input u32 bloom = 1 // 0 exports only the crisp sprite; emission stays separate.
+  // 0: seeded pool (55% peasant, 25% soldier, 20% ornate), 1: force
+  // peasant, 2: force ornate, 3: force soldier.
+  input u32 quality = 0
+  // Peasant metal: 0 rolls it, 1..24 grey/silver, 25..40 ultra-rare hues.
+  input u32 finish = 0
+  // 0: material default/seeded rare condition; 1 worn .. 5 completely clean.
+  input u32 cleanliness = 0
+  // Ultra-rare metals only: 0 rolls, 1 dark .. 5 pale (five matte tones).
+  input u32 tone = 0
+  // 0 rolls: 75% one, 20% two, 5% three rust overlays. 1..7 force a set; 8 none.
+  input u32 rust = 0
+
+  output point tip
+  output point grip
+  // Data: palette ID, strength, native blur sigma, bloom multiplier.
+  output rect glow
+  const sampler<f32> proportions = sampler(0.0 to 1.0 with gaussian(0.5, 0.22))
+  // The seeded pool of qualities: 1 peasant, 2 ornate, 3 soldier.
+  const distribution tiers = weighted {1: 55, 2: 20, 3: 25}
+  // Enchantment power: 1 subtle, 2 normal, 3 strong, 4 intense.
+  const distribution powers = weighted {1: 20, 2: 55, 3: 20, 4: 5}
+  // Peasant metal families: 1 worn grey (finishes 1-16), 2 pale silver
+  // (17-24), 3 one of the sixteen rare hues (25-40).
+  const distribution finishFamilies = weighted {1: 70, 2: 29, 3: 1}
+
+  // Fittings, grips and stones of ornate swords; soldier swords have their own
+  // steel and bronze fittings and dark grips; peasant swords wooden handles.
+  palette fittingMetals = [#b89a56, #c8b888, #aab8c0]
+  palette grips = [#56323a, #283e49, #343a29, #4b3456]
+  palette stones = [#426879, #706086, #497060, #804c58]
+  palette soldierMetals = [#8e989e, #9b8356, #7f878c]
+  palette soldierGrips = [#3e2c24, #2b2724, #4c3628]
+  palette handles = [#51412f, #5e503b, #493b32, #66553c]
+
+  palette metalFinishes = [ #727971, #777874, #808077, #858075, #7b8288, #868b8c, #8c8c82, #929089, #8f969c, #989c9b, #a39d91, #a0a7aa, #aaadab, #b0b0a3, #b5bbc0, #bec1bc, #bec7ce, #c6c6bb, #c8cdd0, #cfd2c9, #d1d8df, #dadbd2, #dde0e2, #e2e5e8, #343840, #44423f, #3d485a, #573c40, #89504f, #713b48, #94684c, #445f4d, #5a8270, #70764b, #497579, #3f5877, #687fa1, #706184, #7e586e, #938253, #777874 ]
+
+  palette magicColors = [ #bd69ff, #855dff, #529dff, #39c8ff, #92d9ff, #38d5cc, #3be9ab, #35cf76, #8cdb53, #c6e957, #f1cc58, #ffac45, #ff8745, #ff5d5d, #e84b63, #d74874, #fa89bd, #ed65de, #c85be8, #b39cff, #dce2ff, #f1e9cf, #82bbc4, #e6a888, #bd69ff ]
+
+  // Stream keys, one per purpose: hash(seed ^ key) seeds that purpose's
+  // stream or single choice. Keep them fixed once a game stores seeds.
+  const i32 enchantKey = 0x2f6b9a13
+  const i32 shapeKey = 0x51ed2701
+  const i32 colorKey = 0x632be5ab
+  const i32 magicKey = 0x41c64e6d
+  const i32 tierKey = 0x7f4a7c15
+  const i32 profileKey = 0x6a09e667
+  const i32 guardKey = 0xbb67ae85
+  const i32 pommelKey = 0x3c6ef372
+  const i32 gripKey = 0xa54ff53a
+  const i32 finishKey = 0x510e527f
+  // Shares finishKey's value: only soldier swords roll it, only peasant
+  // swords roll the finish, so the two never meet in one sword.
+  const i32 sabreGuardKey = 0x510e527f
+  const i32 toneKey = 0x6c8e9cf5
+  const i32 rustKey = 0xb5297a4d
+  const i32 bladeKey = 0x85ebca6b
+  const i32 hiltKey = 0xc2b2ae35
+
+  draw {
+    // ---- enchantment ----------------------------------------------------
+    // 0 rolls from the seed, so a seed alone gives a completely random
+    // sword; 1 or 2 forces it. The roll hashes the seed rather than draw
+    // from the stream, so a rolled pick renders exactly like the explicit
+    // one it chose.
+    lit = clamp(enchant, 1, 2) - 1
+    if (enchant == 0) { lit = md(hash(seed ^ enchantKey), 2) }
+
+    // Geometry has its own stream. Every roll happens before render choices.
+    stream_push(hash(seed ^ shapeKey))
+    profile = 0 to 5
+    // Proportions cluster around the typical weapon; extremes stay rare.
+    dimensions = proportions.pick(5)
+    lengthRoll = dimensions[0]
+    widthRoll = dimensions[1]
+    guardStyle = 0 to 7
+    guardRoll = dimensions[2]
+    gripLength = 10.5 to 17.0 with gaussian(13.75, 1.4)
+    pommelStyle = 0 to 5
+    fitRoll = dimensions[3]
+    bendRoll = dimensions[4]
+    stream_pop()
+
+    bladeLength = 61.0 + lengthRoll * 5.0
+    bladeWidth = 4.8 + widthRoll * 1.0
+    bend = 0.0
+    if (profile == 1) {
+      bladeLength = 58.0 + lengthRoll * 6.0
+      bladeWidth = 6.8 + widthRoll * 1.3
+    } else if (profile == 2) {
+      bladeLength = 54.0 + lengthRoll * 7.0
+      bladeWidth = 8.0 + widthRoll * 1.5
+      bend = 0.75
+    } else if (profile == 3) {
+      // A flame-shaped, undulating edge with a slender cross-section.
+      bladeLength = 58.0 + lengthRoll * 7.0
+      bladeWidth = 5.8 + widthRoll * 1.1
+      bend = 0.75 + bendRoll * 0.35
+    } else if (profile == 4) {
+      // A swept sabre: bend moves its tip, rather than thickening the steel.
+      bladeLength = 55.0 + lengthRoll * 7.0
+      bladeWidth = 4.8 + widthRoll * 1.4
+      bend = 4.5 + bendRoll * 3.0
+    } else if (profile == 5) {
+      // An asymmetric clipped point and restrained spine notches.
+      bladeLength = 55.0 + lengthRoll * 8.0
+      bladeWidth = 5.7 + widthRoll * 1.4
+      bend = -1.4
+    }
+    // Weight the fittings towards the blade's mass; uncommon pairings remain.
+    if (profile == 0 && guardStyle == 5 && fitRoll < 0.72) { guardStyle = 3 }
+    if (profile == 2 && guardStyle == 6 && fitRoll < 0.65) { guardStyle = 2 }
+    guardReach = 9.0 + guardRoll * 4.0 + (bladeWidth - 4.8) * 0.60
+    // Profile weights never exceed 1: at most 1px off each blade edge.
+    bladeWidth = bladeWidth - 1.0
+
+    // Colours have a stream of their own and are all rolled, whatever the
+    // quality, so they never move the construction or each other.
+    stream_push(hash(seed ^ colorKey))
+    metal = fittingMetals[index(3)]
+    leather = grips[index(4)]
+    stone = stones[index(4)]
+    ornament = index(4)
+    soldierMetal = soldierMetals[index(3)]
+    soldierGrip = soldierGrips[index(3)]
+    handle = handles[index(4)]
+    stream_pop()
+    if (ornament == 1) { metal = color.mix(metal, #e1d6b3, 0.25) }
+    else if (ornament == 2) {
+      metal = color.mix(metal, #b78c55, 0.20)
+      leather = color.mix(leather, #705239, 0.60)
+      stone = color.mix(stone, #41755f, 0.45)
+    } else if (ornament == 3) {
+      metal = color.mix(metal, #545c6b, 0.65)
+      leather = color.mix(leather, #4f2632, 0.40)
+      stone = color.mix(stone, #964257, 0.55)
+    }
+    stream_push(hash(seed ^ magicKey))
+    magicId = 1 to 24
+    power = 1 to 4 with powers
+    stream_pop()
+    if (magicPalette == 0) { magicId = 0 }
+    else if (magicPalette >= 2 && magicPalette <= 25) { magicId = int(magicPalette) - 1 }
+    glowColour = color.set.a(magic, 255)
+    if (magicId > 0) { glowColour = enchantmentColor(magicId) }
+    if (glowStrength >= 1 && glowStrength <= 4) { power = int(glowStrength) }
+    blurSigma = 1.8
+    bloomGain = 1.7
+    if (power == 1) { blurSigma = 1.2; bloomGain = 0.8 }
+    else if (power == 3) { blurSigma = 2.8; bloomGain = 4.5 }
+    else if (power == 4) { blurSigma = 3.8; bloomGain = 9.0 }
+    cx = 60.5
+    cy = 60.5
+
+    stream_push(hash(seed ^ tierKey))
+    tier = 1 to 3 with tiers
+    stream_pop()
+    if (quality >= 1 && quality <= 3) { tier = int(quality) }
+    common = tier == 1
+    soldier = tier == 3
+    if (soldier == 1) {
+      // A soldier's sword: an arming sword, sabre or clipped falchion with
+      // plain fittings, in steel or bronze and dark leather. Its modest
+      // enchantment is subtle or normal unless an intensity is forced.
+      profile = choose(hash(seed ^ profileKey), 0, 0, 4, 5)
+      guardStyle = choose(hash(seed ^ guardKey), 3, 3, 2, 0)
+      if (profile == 4 && choose(hash(seed ^ sabreGuardKey), 0, 1) == 1) { guardStyle = 6 }
+      pommelStyle = choose(hash(seed ^ pommelKey), 0, 1, 4)
+      ornament = 0
+      metal = soldierMetal
+      leather = soldierGrip
+      bladeLength = 59.0 + lengthRoll * 6.0
+      bladeWidth = 4.6
+      bend = 0.0
+      if (profile == 4) {
+        bladeLength = 55.0 + lengthRoll * 7.0
+        bend = 3.5 + bendRoll * 2.0
+      } else if (profile == 5) {
+        bladeLength = 54.0 + lengthRoll * 7.0
+        bladeWidth = 5.2
+        bend = -1.4
+      }
+      bladeWidth = bladeWidth + widthRoll * 1.0
+      guardReach = 8.0 + guardRoll * 3.0 + (bladeWidth - 4.6) * 0.5
+      bladeWidth = bladeWidth - 1.0
+      if (glowStrength == 0 && power > 2) {
+        power = 2
+        blurSigma = 1.8
+        bloomGain = 1.7
+      }
+    }
+    glow = {float(magicId), float(power), blurSigma, bloomGain}
+    if (common == 1) { glow = {0.0, 0.0, 0.0, 0.0} }
+    if (common == 0 && lit == 1 && renderPass == 0 && bloom != 0) {
+      layer aura(alpha=surface.source_over) {
+        curve({cx, cy}, {cx - bladeLength * 0.35, cy - bladeLength * 0.35},
+              {cx + (bend - bladeLength) * 0.70710678,
+               cy - (bend + bladeLength) * 0.70710678},
+              bladeWidth * 1.1, color.set.a(glowColour, 28 + power * 12))
+      }
+      surface.paint(aura.blur(min(blurSigma, 2.4)), blend=surface.source_over)
+    }
+    if (common == 1) {
+      profile = choose(hash(seed ^ profileKey), 0, 1, 2, 3)
+      guardStyle = choose(hash(seed ^ guardKey), 0, 1, 2, 3)
+      pommelStyle = choose(hash(seed ^ pommelKey), 0, 1, 2)
+      gripStyle = choose(hash(seed ^ gripKey), 0, 1, 2)
+      bladeLength = 51.0 + lengthRoll * 14.0
+      bladeWidth = 3.4 + widthRoll * 1.2
+      bend = 0.0
+      if (profile == 1) { bladeLength = 44.0 + lengthRoll * 9.0 }
+      else if (profile == 2) { bladeLength = 52.0 + lengthRoll * 10.0 }
+      else if (profile == 3) {
+        bladeLength = 54.0 + lengthRoll * 8.0
+        bend = 0.6 + bendRoll * 0.6
+      }
+      guardReach = 6.5 + guardRoll * 3.0 + (bladeWidth - 3.4) * 0.4
+      gripLength = 10.5 + (gripLength - 10.5) * 0.77
+      // Independent material stream: recolouring never rerolls the fittings.
+      stream_push(hash(seed ^ finishKey))
+      family = 1 to 3 with finishFamilies
+      finishId = 1 to 16
+      silverId = 17 to 24
+      rareId = 25 to 40
+      toneOffset = -3 to 3
+      stream_pop()
+      if (family == 2) { finishId = silverId }
+      if (family == 3) { finishId = rareId }
+      if (finish >= 1 && finish <= 40) {
+        finishId = int(finish)
+        toneOffset = 0
+      }
+      wear = 1.0
+      if (finishId >= 25) {
+        // Cleanliness and tone vary independently, without rerolling the hue.
+        stream_push(hash(seed ^ toneKey))
+        cleanId = 1 to 5
+        toneId = 1 to 5
+        stream_pop()
+        if (tone >= 1 && tone <= 5) { toneId = int(tone) }
+        toneOffset = toneOffset + (toneId - 2) * 8
+      }
+      if (finishId < 25) { cleanId = 1 }
+      if (cleanliness >= 1 && cleanliness <= 5) { cleanId = int(cleanliness) }
+      if (cleanId == 2) { wear = 0.72 }
+      else if (cleanId == 3) { wear = 0.40 }
+      else if (cleanId >= 4) { wear = 0.0 }
+      // Pale silver is clean at every setting; cleaning also removes hilt rust.
+      if (finishId >= 17 && finishId <= 24) { wear = 0.0 }
+      rustStyle = rollRust(int(rust))
+      iron = color.shade(metalFinish(finishId), toneOffset)
+      // Plain swords have neither polished fittings nor an enchantment pass.
+      if (renderPass == 0) {
+        plainBlade.draw(hash(seed ^ bladeKey), at = {0, 0},
+                        cx = cx, cy = cy, length = bladeLength, width = bladeWidth,
+                        style = profile, bend = bend, iron = iron, wear = wear, rust = rustStyle)
+        plainHilt.draw(hash(seed ^ hiltKey), at = {0, 0},
+                       cx = cx, cy = cy, reach = guardReach, style = guardStyle,
+                       gripLength = gripLength, gripStyle = gripStyle,
+                       pommel = pommelStyle, iron = iron, handle = handle, wear = wear, rust = rustStyle)
+      }
+    } else {
+      blade.draw(hash(seed ^ bladeKey), lit = lit, at = {0, 0},
+                 cx = cx, cy = cy, length = bladeLength, width = bladeWidth,
+                 profile = profile, bend = bend, ornament = ornament,
+                 metal = metal, magic = glowColour, power = power, renderPass = renderPass, soldier = soldier)
+      hilt.draw(hash(seed ^ hiltKey), lit = lit, at = {0, 0},
+                cx = cx, cy = cy, reach = guardReach, style = guardStyle,
+                gripLength = gripLength, pommel = pommelStyle, ornament = ornament, metal = metal,
+                leather = leather, stone = stone, magic = glowColour, power = power, renderPass = renderPass,
+                soldier = soldier)
+    }
+
+    // Stable attachment points, including when rendering an empty map.
+    tipOffset = 0.0
+    if (common == 0 && (profile == 4 || profile == 5)) { tipOffset = bend }
+    if (common == 1 && profile == 3) { tipOffset = bend }
+    tip = {cx + (tipOffset - bladeLength) * 0.70710678,
+           cy - (tipOffset + bladeLength) * 0.70710678}
+    grip = {cx + (3.5 + gripLength * 0.5) * 0.70710678,
+            cy + (3.5 + gripLength * 0.5) * 0.70710678}
+  }
+
+  const distribution rustMixture = weighted {1: 25, 2: 25, 3: 25, 4: 7, 5: 6, 6: 7, 7: 5}
+
+  rollRust(mode: i32) -> i32 {
+    stream_push(hash(seed ^ rustKey))
+    look = 1 to 7 with rustMixture
+    stream_pop()
+    if (mode >= 1 && mode <= 8) { look = mode }
+    return look
+  }
+
+  metalFinish(k: i32) -> color { return metalFinishes[k - 1] }
+
+  enchantmentColor(k: i32) -> color { return magicColors[k - 1] }
+
+  // A non-negative remainder, for choosing among m options by a hash.
+  md(x: i32, m: i32) -> i32 { return ((x % m) + m) % m }
+}

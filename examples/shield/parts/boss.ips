@@ -1,0 +1,146 @@
+// boss.ips — the boss in the middle of the shield, the metal cup over the
+// hand that holds it. Its origin is its centre: the root places it on the
+// board's `boss` point, and its pixels are symmetric about that point.
+// Styles: 1 dome, 2 flanged dome, 3 spike, 4 square or diamond plate under a
+// small dome, 5 dome in a ring of studs. It exports its footprint, so the
+// root can cast its shadow on the face.
+
+import mats from "../materials.ips"
+
+asset ShieldBoss {
+  size 24x24
+  origin 12, 12
+  input u32 style = 1             // 1 dome .. 5 studded
+  input f32 radius = 4.0          // the dome's radius in pixels
+  input color metal = #8a929a
+  output mask footprint
+
+  const f32 cx = 12.0
+  const f32 cy = 12.0
+  const color solid = #ffffff
+
+  draw {
+    m = mats.Metal(base = metal)
+    tones = [m.deep, m.shadow, m.base, m.light, m.shine]
+    kind = clamp(int(style), 1, 5)
+    r = clamp(radius, 2.5, 7.0)
+    // Every roll first, whatever the style.
+    rivets = pick(4, 8)
+    diamond = chance(0.4)
+    layer image(alpha = surface.source_over) {
+      // A dome standing on a flange or a plate is outlined in the metal's
+      // deep tone: only the boss's outer edge takes the dark outline.
+      if (kind == 2) {
+        flange(r + 2.0, rivets, tones, m.edge)
+        dome(r - 0.5, tones, tones[0])
+      } else if (kind == 3) {
+        cone(r, tones, m.edge)
+      } else if (kind == 4) {
+        plate(round(r + 1.5), diamond, tones, m.edge)
+        dome(r - 1.5, tones, tones[0])
+      } else if (kind == 5) {
+        dome(r - 0.5, tones, m.edge)
+        studRing(r + 2.0, 8, tones)
+      } else {
+        dome(r, tones, m.edge)
+      }
+    }
+    surface.paint(image, blend = surface.source_over)
+    footprint = mask.from(image)
+  }
+
+  // A disc of radius `rad` about the centre, as rows of even width.
+  disc(rad: f32, c: color) {
+    n = int(ceil(rad))
+    for i in -n..n {
+      dy = float(i) + 0.5
+      if (dy * dy < rad * rad) {
+        hw = round(sqrt(rad * rad - dy * dy))
+        if (hw >= 1) { rect(cx - float(hw), cy + float(i), float(hw * 2), 1.0, c) }
+      }
+    }
+  }
+
+  // A dome: outlined, a shadow crescent on the lower right, a lit cap on the
+  // upper left and a glint.
+  dome(rad: f32, tones: list<color>, edge: color) {
+    layer cup(alpha = surface.source_over) { disc(rad, solid) }
+    mask shape = mask.from(cup)
+    cut = 1
+    if (rad >= 4.5) { cut = 2 }
+    lift = max(1, round(rad * 0.3))
+    surface.paint(mask.expand(shape, 1), edge, blend = surface.source_over)
+    surface.paint(shape, tones[1], blend = surface.source_over)
+    surface.paint(mask.intersect(shape, mask.offset(shape, -cut, -cut)), tones[2], blend = surface.source_over)
+    surface.paint(mask.intersect(shape, mask.offset(mask.shrink(shape, lift), -lift, -lift)), tones[3], blend = surface.source_over)
+    g = round(cx - rad * 0.45)
+    pixel(g, g, tones[4])
+    if (rad >= 5.0) { pixel(g + 1, g, tones[4]) }
+  }
+
+  // A flat flange around the dome, with rivets.
+  flange(rad: f32, count: i32, tones: list<color>, edge: color) {
+    layer ring(alpha = surface.source_over) { disc(rad, solid) }
+    mask shape = mask.from(ring)
+    surface.paint(mask.expand(shape, 1), edge, blend = surface.source_over)
+    surface.paint(shape, tones[2], blend = surface.source_over)
+    surface.paint(mask.subtract(shape, mask.offset(shape, -1, -1)), tones[1], blend = surface.source_over)
+    surface.paint(mask.subtract(shape, mask.offset(shape, 1, 1)), tones[3], blend = surface.source_over)
+    step = 6.2831853 / float(count)
+    for k in 0..count {
+      a = step * (float(k) + 0.5)
+      pixel(int(floor(cx + (rad - 1.0) * cos(a))), int(floor(cy + (rad - 1.0) * sin(a))), tones[4])
+    }
+  }
+
+  // A spike seen from the front: four facets meeting at a bright point.
+  cone(rad: f32, tones: list<color>, edge: color) {
+    layer cup(alpha = surface.source_over) { disc(rad, solid) }
+    mask shape = mask.from(cup)
+    surface.paint(mask.expand(shape, 1), edge, blend = surface.source_over)
+    surface.paint(shape, tones[2], blend = surface.source_over)
+    clip(shape) {
+      rect(cx - 12.0, cy - 12.0, 12.0, 12.0, tones[3])
+      rect(cx, cy, 12.0, 12.0, tones[1])
+      rect(cx, cy, 1.0, 12.0, tones[0])
+      rect(cx, cy, 12.0, 1.0, tones[0])
+    }
+    pixel(int(cx) - 1, int(cy) - 1, tones[4])
+    pixel(int(cx) - 2, int(cy) - 2, tones[4])
+  }
+
+  // A square (or diamond) plate under a small dome, riveted at its corners.
+  plate(h: i32, diamond: i32, tones: list<color>, edge: color) {
+    s = float(h)
+    layer slab(alpha = surface.source_over) {
+      if (diamond) { poly(solid, cx, cy - s - 1.0, cx + s + 1.0, cy, cx, cy + s + 1.0, cx - s - 1.0, cy) }
+      else { rect(cx - s, cy - s, s * 2.0, s * 2.0, solid) }
+    }
+    mask shape = mask.from(slab)
+    surface.paint(mask.expand(shape, 1), edge, blend = surface.source_over)
+    surface.paint(shape, tones[2], blend = surface.source_over)
+    surface.paint(mask.subtract(shape, mask.offset(shape, -1, -1)), tones[1], blend = surface.source_over)
+    surface.paint(mask.subtract(shape, mask.offset(shape, 1, 1)), tones[3], blend = surface.source_over)
+    if (diamond == 0) {
+      lo = int(cx) - h + 1
+      hi = int(cx) + h - 2
+      pixel(lo, lo, tones[4])
+      pixel(hi, lo, tones[4])
+      pixel(lo, hi, tones[4])
+      pixel(hi, hi, tones[4])
+    }
+  }
+
+  // A ring of studs on the face around the dome, each a bright head with its
+  // shadow below and to the right.
+  studRing(rad: f32, count: i32, tones: list<color>) {
+    step = 6.2831853 / float(count)
+    for k in 0..count {
+      a = step * (float(k) + 0.5)
+      x = int(floor(cx + rad * cos(a)))
+      y = int(floor(cy + rad * sin(a)))
+      pixel(x, y, tones[4])
+      pixel(x + 1, y + 1, tones[0])
+    }
+  }
+}

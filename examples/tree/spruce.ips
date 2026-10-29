@@ -1,0 +1,454 @@
+import wood from "materials.ips";
+
+// A spruce in the small-pixel style of the tree beside it: a straight trunk
+// flared into roots and mostly hidden under tiers of needles that hang from
+// it and droop to their tips. Each tier is lit along its top from the upper
+// left and dark underneath, so the tiers stack in bands, and needles hang
+// from their lower edges in a ragged fringe. A thin leader tops the tree,
+// and some spruces carry cones. Every seed grows a different spruce: the
+// silhouette (classic, slender, old, wild or young), its height and width,
+// how many tiers it has, whether its branches droop or turn up at the
+// tips, its lean, gaps and bare lower branches, a double or broken top,
+// its cones, and the colours of its needles and bark, every one drawn from
+// a gradient.
+//
+// Variety: high (every silhouette differs; the greens stay close)
+asset Spruce {
+  size 128x128
+  origin 64, 124
+  input u32 kind = 0                // 0 rolls; 1 classic, 2 slender, 3 old, 4 wild, 5 young
+  input color needles = #00000000   // needle colour; transparent rolls one
+  output point anchor
+  output rect collider
+  output rect crown                 // the bounds of the needles
+
+  const distribution typical = gaussian(mean = 0.5, sigma = 0.18)
+  const distribution kinds = weighted {1: 30, 2: 18, 3: 18, 4: 16, 5: 18}
+  // 1 is the material's dark spruce green; then a fresh green, a dark
+  // blue-green and a yellow-green.
+  const distribution greens = weighted {1: 50, 2: 19, 3: 18, 4: 13}
+  palette hues = [#3e6234 to #587a40, #22423e to #3a5e54, #546e32 to #6e863a]
+  // 1 is the material's brown; then grey-brown and red-brown.
+  const distribution barkKinds = weighted {1: 50, 2: 30, 3: 20}
+  palette barks = [#4a423e to #6a625a, #5a3426 to #7c4c36]
+
+  // Stream keys, one per purpose: hash(seed ^ key) seeds that purpose's
+  // stream. Keep them fixed once a game stores seeds.
+  const i32 kindKey = 0x2f6b9a13
+  const i32 shapeKey = 0x51ed2701
+  const i32 colorKey = 0x6e656564   // "need" in ASCII, for the needles
+  const i32 kinkKey = 0x6b696e6b    // "kink": the trunk's bends
+
+  // The trunk's passes, in painting order.
+  const i32 WOOD_DARK = 0
+  const i32 WOOD_BODY = 1
+  const i32 WOOD_LIGHT = 2
+
+  draw {
+    // Every roll is hashed from the seed before anything draws, so a
+    // rolled kind renders exactly like the same kind chosen explicitly.
+    looks = hash(seed ^ kindKey)
+    colours = hash(seed ^ colorKey)
+    shape = hash(seed ^ shapeKey)
+    kink = hash(seed ^ kinkKey)
+    look = clamp(kind, 0, 5)
+    if (look == 0) {
+      stream_push(looks)
+      look = 1 to 5 with kinds
+      stream_pop()
+    }
+    stream_push(colours)
+    bark = wood.Bark()
+    green = wood.Needles()
+    cone = wood.Cone()
+    barkKind = 1 to 3 with barkKinds
+    barkTint = barks[clamp(barkKind - 2, 0, 1)].pick()
+    family = 1 to 4 with greens
+    hue = hues[clamp(family - 2, 0, 2)].pick()
+    stream_pop()
+    if (barkKind > 1) { bark = wood.Bark(base = barkTint) }
+    if (family > 1) { green = wood.Needles(base = hue) }
+    if (needles.a > 0) { green = wood.Needles(base = color.set.a(needles, 255)) }
+
+    stream_push(shape)
+    size = 0.0 to 1.0 with typical
+    girth = 0.0 to 1.0 with typical
+    wide = 0.0 to 1.0 with typical
+    droopRoll = 0.0 to 1.0
+    leanRoll = 0.0 to 1.0
+    tierRoll = 0.0 to 1.0
+    side = pick(-1.0, 1.0)
+    twist = 0.0 to 6.2832
+    curlRoll = 0.0 to 1.0
+    topRoll = 0.0 to 1.0
+
+    // The silhouette sets the height, the width at the bottom tier (a share
+    // of the height), the tiers and how they hang, and what else it has.
+    height = 100.0
+    bottom = 0.1      // where the needles start, a share of the height
+    half = 0.2        // the bottom tier's reach, a share of the height
+    tiers = 10
+    droop = 0.25      // how far a tier's tips fall, a share of its reach
+    thick = 1.9       // a tier's depth, in gaps between tiers
+    bulge = 1.0       // 1 a straight cone; less is fuller near the top
+    asym = 0.08       // how much further the tiers reach on one side
+    skip = 0.0        // chance of a gap where a tier is missing
+    lean = 0.0
+    baseW = 7.0
+    dryChance = 0.15
+    coneChance = 0.45
+    curlChance = 0.35   // chance the branch tips turn up instead of hanging
+    brokenChance = 0.04 // chance of a broken top
+    doubleChance = 0.05 // chance of a second leader
+    if (look == 1) {
+      // Classic: a dense, even cone of tiers down to the ground.
+      height = lerp(88.0, 114.0, size)
+      bottom = lerp(0.05, 0.12, wide)
+      half = lerp(0.19, 0.25, wide)
+      tiers = 9 + int(tierRoll * 4.0)
+      droop = lerp(0.18, 0.32, droopRoll)
+      thick = lerp(1.8, 2.2, tierRoll)
+      lean = side * lerp(0.0, 0.05, leanRoll)
+      baseW = lerp(6.0, 9.0, girth)
+    } else if (look == 2) {
+      // Slender: a tall, narrow column of short tiers.
+      height = lerp(98.0, 116.0, size)
+      bottom = lerp(0.04, 0.1, wide)
+      half = lerp(0.09, 0.13, wide)
+      tiers = 12 + int(tierRoll * 5.0)
+      droop = lerp(0.1, 0.2, droopRoll)
+      thick = lerp(1.8, 2.3, tierRoll)
+      bulge = 0.75
+      lean = side * lerp(0.0, 0.04, leanRoll)
+      baseW = lerp(5.0, 7.0, girth)
+      coneChance = 0.3
+    } else if (look == 3) {
+      // Old: a tall trunk bare and twiggy low down, under long, drooping
+      // tiers with gaps between them.
+      height = lerp(102.0, 116.0, size)
+      bottom = lerp(0.24, 0.38, wide)
+      half = lerp(0.16, 0.21, wide)
+      tiers = 8 + int(tierRoll * 4.0)
+      droop = lerp(0.35, 0.5, droopRoll)
+      thick = lerp(1.1, 1.5, tierRoll)
+      bulge = 0.8
+      asym = 0.18
+      skip = 0.15
+      lean = side * lerp(0.0, 0.06, leanRoll)
+      baseW = lerp(8.0, 12.0, girth)
+      dryChance = 1.0
+      coneChance = 0.6
+      curlChance = 0.1
+      brokenChance = 0.25
+      doubleChance = 0.1
+    } else if (look == 4) {
+      // Wild: a leaning spruce, its tiers reaching much further to one
+      // side, ragged and gappy.
+      height = lerp(82.0, 110.0, size)
+      bottom = lerp(0.1, 0.25, wide)
+      half = lerp(0.15, 0.21, wide)
+      tiers = 7 + int(tierRoll * 4.0)
+      droop = lerp(0.2, 0.35, droopRoll)
+      thick = lerp(1.2, 1.7, tierRoll)
+      asym = lerp(0.35, 0.6, leanRoll)
+      skip = 0.15
+      lean = side * lerp(0.08, 0.2, leanRoll)
+      baseW = lerp(6.0, 9.0, girth)
+      dryChance = 0.5
+      brokenChance = 0.2
+      doubleChance = 0.2
+    } else {
+      // Young: a short, bushy cone, its tiers close together.
+      height = lerp(56.0, 80.0, size)
+      bottom = lerp(0.03, 0.08, wide)
+      half = lerp(0.26, 0.34, wide)
+      tiers = 6 + int(tierRoll * 4.0)
+      droop = lerp(0.12, 0.2, droopRoll)
+      thick = lerp(2.0, 2.5, tierRoll)
+      bulge = 1.15
+      baseW = lerp(4.0, 6.0, girth)
+      dryChance = 0.0
+      coneChance = 0.1
+      brokenChance = 0.0
+    }
+
+    // Branch tips turn up on some spruces, hang on the rest; the top is
+    // whole, broken off above the upper tiers or split into two leaders.
+    curl = 0.0
+    if (curlRoll < curlChance) { curl = 0.45 + 0.3 * curlRoll / max(curlChance, 0.01) }
+    broken = topRoll < brokenChance
+    split = topRoll >= brokenChance && topRoll < brokenChance + doubleChance
+
+    // The spruce stands where its lean and its longer side keep it on the
+    // canvas.
+    leanPx = lean * height
+    x0 = 64.0 - leanPx * 0.6 - side * asym * half * height * 0.5 + (-3.0 to 3.0)
+    anchor = {x0, 124.0}
+    collider = {x0 - baseW * 0.5, 120.0, baseW, 4.0}
+    roots = [1.33 to 1.5, 0.7 to 1.1, 1.33 to 1.5, 0.7 to 1.1]
+
+    // The trunk, cut off flat by the ground along the outline's dark edge.
+    layer ground(alpha = surface.legacy) { rect(0, 0, 128, 124, #ffffff) }
+    soil = mask.from(ground)
+    clip(soil) { trunk(WOOD_DARK, x0, leanPx, height, baseW, kink, twist, roots, bark) }
+    clip(mask.offset(soil, 0, -1)) {
+      trunk(WOOD_BODY, x0, leanPx, height, baseW, kink, twist, roots, bark)
+      trunk(WOOD_LIGHT, x0, leanPx, height, baseW, kink, twist, roots, bark)
+    }
+
+    // Dead twigs on the bare trunk below the needles.
+    dry = chance(dryChance)
+    dryCount = 3 to 7
+    if (dry) {
+      for k in 0..dryCount {
+        at = trunkAt(0.08 to bottom + 0.04, x0, leanPx, height, kink)
+        out = pick(-1.0, 1.0)
+        a = 1.5708 - out * (1.0 to 1.45)
+        len = 5.0 to 12.0
+        tip = at + {cos(a), sin(a)} * len
+        line(at, tip, 1, bark.twig)
+        fork = a + out * (0.3 to 0.7)
+        line(at + (tip - at) * 0.55, at + (tip - at) * 0.55 + {cos(fork), sin(fork)} * (len * 0.45), 1, bark.twig)
+      }
+    }
+
+    // The tiers, from the bottom up, so each hangs over the one below.
+    // They narrow towards the top, and each drifts a little from the
+    // tree's colour.
+    hasCones = chance(coneChance)
+    gap = height * (0.97 - bottom) / float(tiers - 1)
+    left = 128.0
+    right = 0.0
+    upper = 124.0
+    lower = 0.0
+    for k in 0..tiers {
+      u = float(k) / float(tiers - 1)
+      at = trunkAt(lerp(bottom, 0.97, pow(u, 0.92)), x0, leanPx, height, kink)
+      reach = half * height * pow(1.0 - u * 0.94, bulge) * (0.85 to 1.15) + 1.5
+      tilt = asym * side * (0.6 to 1.0)
+      wl = reach * (1.0 - tilt)
+      wr = reach * (1.0 + tilt)
+      hang = reach * droop * (0.7 to 1.25)
+      deep = max(3.0, gap * thick * (0.85 to 1.15) * lerp(1.0, 0.7, u))
+      missing = chance(skip)
+      grain = 0 to 1000000000
+      drift = #2a4a7a to #d8d070
+      amount = 0.0 to 0.1
+      lift = -8 to 8
+      coneCount = 0 to 2
+      gone = broken && k >= tiers - 2
+      if ((!missing || k == 0 || k >= tiers - 3) && !gone) {
+        // The branch wood, mostly hidden: it shows where the needles hang
+        // thin under the tier.
+        for sideK in 0..2 {
+          o = float(sideK) * 2.0 - 1.0
+          w = wr
+          if (o < 0.0) { w = wl }
+          line(at + {0.0, deep * 0.5}, at + {o * w * 0.9, hangAt(0.9, hang, deep, curl) + depthAt(0.9, deep) * 0.7}, 1, bark.twig)
+        }
+        tones = [drifted(green.deep, drift, amount, lift), drifted(green.shade, drift, amount, lift), drifted(green.base, drift, amount, lift),
+                 drifted(green.light, drift, amount, lift), drifted(green.glint, drift, amount, lift)]
+        tier(at.x, at.y, wl, wr, hang, deep, curl, 0.12 * u, tones, grain)
+        left = min(left, at.x - wl)
+        right = max(right, at.x + wr)
+        upper = min(upper, at.y - deep * 0.5)
+        lower = max(lower, at.y + hang + deep)
+        // Cones hang from under the outer half of the upper tiers.
+        if (hasCones && u > 0.4 && u < 0.92) {
+          for c in 0..coneCount {
+            out = pick(-1.0, 1.0)
+            share = 0.45 to 0.8
+            w = wr
+            if (out < 0.0) { w = wl }
+            hangingCone(at + {out * w * share, hangAt(share, hang, deep, curl) + depthAt(share, deep) - 1.5}, cone)
+          }
+        }
+      }
+    }
+    crown = {left, upper, right - left, lower - upper}
+
+    // The top: a thin leader standing above the top tier, a second one
+    // beside it on a split top, or a dead snag where the top broke off.
+    tip = trunkAt(1.0, x0, leanPx, height, kink)
+    shoot = min(3.0 to 7.0, tip.y - 5.0)
+    lean2 = pick(-1.0, 1.0) * (0.35 to 0.6)
+    if (broken) {
+      snag = trunkAt(0.9, x0, leanPx, height, kink)
+      line(snag, snag + {lean2 * 2.0, -shoot * 0.8}, 1, bark.twig)
+    } else {
+      leader(tip, shoot, -1.5708, green)
+      if (split) { leader(tip + {0.0, shoot * 0.6}, shoot * 0.8, -1.5708 + lean2, green) }
+    }
+    stream_pop()
+  }
+
+  // The trunk in the tone of `mode`: two roots flaring along the ground
+  // and the trunk itself, narrowing to a twig at the top.
+  trunk(mode: i32, x0: f32, leanPx: f32, height: f32, baseW: f32, kink: i32, twist: f32, roots: list<f32>, b: wood.Bark) {
+    p = {x0, 124.0}
+    for k in 0..2 {
+      rs = float(k) * 2.0 - 1.0
+      ra = 1.5708 - rs * roots[k * 2]
+      root = p + {rs * baseW * 0.32, -2.0}
+      tube(mode, root, root + {cos(ra), sin(ra)} * (baseW * roots[k * 2 + 1]), baseW * 0.62, 1.2, twist, b)
+    }
+    steps = int(height / 3.0)
+    for i in 0..steps {
+      t0 = float(i) / float(steps)
+      t1 = float(i + 1) / float(steps)
+      tube(mode, trunkAt(t0, x0, leanPx, height, kink), trunkAt(t1, x0, leanPx, height, kink),
+           trunkWidth(t0, baseW), trunkWidth(t1, baseW), twist + t0 * height * 0.18, b)
+    }
+  }
+
+  // The trunk's centre at height t, 0 at the ground and 1 at the top: it
+  // leans most low down, straightening as it rises, with a slight wobble.
+  trunkAt(t: f32, x0: f32, leanPx: f32, height: f32, kink: i32) -> vec2 {
+    return {x0 + leanPx * sin(t * 1.5708) + 3.0 * (noise(t * 3.0, 0.5, kink) - 0.5), 124.0 - t * height}
+  }
+
+  // The trunk's width at height t: it narrows evenly to the top and flares
+  // a little into the roots.
+  trunkWidth(t: f32, baseW: f32) -> f32 {
+    flare = max(0.0, 1.0 - t / 0.1)
+    return lerp(baseW, 1.0, t) + baseW * 0.3 * flare * flare
+  }
+
+  // A needle tone drifted towards a tier's own tint and brightness.
+  drifted(tone: color, drift: color, amount: f32, lift: i32) -> color {
+    return color.shade(color.mix(tone, drift, amount), lift)
+  }
+
+  // One tier of needles, painted column by column in runs: branches
+  // hanging from the trunk at (cx, top) out to tips wl to the left and wr
+  // to the right, their tips falling by droop (and turning up by curl),
+  // the tier about thick deep at the trunk and thinning to its tips. Its
+  // outline depends only on the column, so each column works it out once.
+  // The top of the tier rises a little by the trunk and is lit, most at
+  // its upper left; its underside is in deep shade. Its lower edge hangs in
+  // a ragged fringe of needles, and a streaky grain runs down and out along
+  // them.
+  tier(cx: f32, top: f32, wl: f32, wr: f32, droop: f32, thick: f32, curl: f32, lift: f32, tones: list<color>, grain: i32) {
+    span = max(wl, wr)
+    for x in int(cx - wl)..int(cx + wr) + 1 {
+      fx = float(x) + 0.5
+      s = fx - cx
+      w = wr
+      out = 1.0
+      if (s < 0.0) {
+        w = wl
+        out = -1.0
+      }
+      d = abs(s) / w
+      if (d < 1.0) {
+        upperEdge = top + hangAt(d, droop, thick, curl) + (noise(fx * 0.8, top * 0.37, grain) - 0.5) * 1.8
+        depth = depthAt(d, thick) * (0.75 + 0.5 * noise(fx * 0.75, top * 0.37 + 9.0, grain))
+        light = lift + 0.7 - 0.3 * s / span
+        y0 = int(ceil(upperEdge - 0.5))
+        y1 = int(ceil(upperEdge + depth - 0.5))
+        run = -1
+        runY = y0
+        for y in y0..y1 + 1 {
+          tone = -1
+          if (y < y1) {
+            fy = float(y) + 0.5
+            needle = noise((fx - out * 0.6 * fy) * 0.8, fy * 0.25, grain ^ 0x3d)
+            t = light - 1.6 * (fy - upperEdge) / depth + (needle - 0.5) * 0.8
+            tone = 0
+            if (t > 0.85) { tone = 4 } else if (t > 0.42) { tone = 3 } else if (t > 0.02) { tone = 2 } else if (t > -0.45) { tone = 1 }
+          }
+          if (tone != run) {
+            if (run >= 0) { rect(x, runY, 1, y - runY, tones[run]) }
+            run = tone
+            runY = y
+          }
+        }
+      }
+    }
+  }
+
+  // Where a tier's top edge lies, below its point on the trunk, at d of its
+  // reach: a little above it by the trunk, falling by droop towards the
+  // tips, which turn back up by curl.
+  hangAt(d: f32, droop: f32, thick: f32, curl: f32) -> f32 {
+    return droop * d * d * (1.0 - curl * d * d * 1.5) - thick * 0.45 * (1.0 - d)
+  }
+
+  // A leader: a thin shoot of length len at angle a from p, with a few
+  // needles on its lit side.
+  leader(p: vec2, len: f32, a: f32, g: wood.Needles) {
+    end = p + {cos(a), sin(a)} * (len + 2.0)
+    line(p + {0.0, 2.0}, end, 1, g.base)
+    pixel(end, g.light)
+    mid = lerp(p, end, 0.5)
+    pixel(mid + {-1.0, 0.0}, g.light)
+    pixel(mid + {1.0, 1.0}, g.shade)
+  }
+
+  // A tier's depth at d of its reach, thinning to a point at the tips.
+  depthAt(d: f32, thick: f32) -> f32 {
+    return thick * (1.0 - 0.6 * d) * (1.0 - 0.7 * d * d * d * d)
+  }
+
+  // A cone hanging from a tier with its top at p: a long oval, dark
+  // underneath and lit at its upper left.
+  hangingCone(p: vec2, c: wood.Cone) {
+    oval(p + {0.0, 2.4}, 1.2, 2.6, c.deep)
+    oval(p + {-0.3, 1.8}, 0.8, 1.9, c.base)
+    pixel(int(p.x - 0.4), int(p.y + 1.0), c.light)
+  }
+
+  // One length of wood from a to b, wa and wb wide at its ends, in the
+  // tone of this pass: the dark outline, then the body shifted towards the
+  // light, then the strands of bark twisting round it. Wood under 2.6 px
+  // is a crisp twig line, painted with the outline.
+  tube(mode: i32, a: vec2, b: vec2, wa: f32, wb: f32, twist: f32, m: wood.Bark) {
+    d = b - a
+    len = vec2.len(d)
+    if (len < 0.05) { return; }
+    dir = d / len
+    lit = {dir.y, 0.0 - dir.x}
+    if (vec2.dot(lit, {-0.6, -0.8}) < 0.0) { lit = -lit }
+    thick = max(wa, wb)
+    if (thick < 2.6) {
+      if (mode == WOOD_DARK) {
+        th = 1
+        if (thick >= 1.8) { th = 2 }
+        line(a, b, th, m.twig)
+      }
+      return;
+    }
+    steps = int(len * 2.0) + 1
+    for j in 0..steps + 1 {
+      u = float(j) / float(steps)
+      c = lerp(a, b, u)
+      r = lerp(wa, wb, u) * 0.5
+      if (mode == WOOD_DARK) {
+        oval(c, r, r, m.deep)
+      } else if (mode == WOOD_BODY && r > 1.4) {
+        rb = r * 0.85 - 1.0
+        oval(c + lit * (r * 0.15), rb, rb, m.base)
+      } else if (mode == WOOD_LIGHT && r > 1.9) {
+        // The strands run round the wood in a slow helix. Only the front
+        // of each turn shows: lit on the side towards the light, half lit
+        // in the middle, and a dark groove after each strand.
+        rl = max(0.6, r * 0.16)
+        reach = r - 1.0 - rl
+        strands = 2 + int(r / 3.0)
+        for k in 0..strands {
+          turn = twist + u * len * 0.18 + float(k) * 6.2832 / float(strands)
+          if (cos(turn) > 0.0) {
+            across = sin(turn)
+            if (across > 0.2) {
+              oval(c + lit * (reach * across), rl, rl, m.light)
+            } else if (across > -0.35) {
+              oval(c + lit * (reach * across), rl * 0.85, rl * 0.85, m.sheen)
+            }
+          }
+          groove = turn + 3.1416 / float(strands)
+          if (cos(groove) > 0.25) { oval(c + lit * (reach * sin(groove)), 0.55, 0.55, m.deep) }
+        }
+      }
+    }
+  }
+}

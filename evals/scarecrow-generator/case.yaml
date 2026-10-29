@@ -1,0 +1,9 @@
+schema_version: "1.1"
+name: scarecrow-generator
+expected_outcome: |
+  A scarecrow/ folder holds an Infinite Props asset (scarecrow.ips plus any parts and material
+  library) that compiles with Infinite Props 0.8.0, renders seeds 1-200 without traps, and gives a
+  clearly different scarecrow for every seed at high variety: several hat and head families, clothes
+  in many colours with patches, straw, a wooden post and crossbar and an occasional crow. It declares
+  an anchor, a perch point for a crow and a collider, set on the canvas for every seed, and
+  scarecrow/scarecrow.iprop is compiled.

@@ -1,0 +1,108 @@
+// __STEM__.ips — <one line: what this prop is and where a game uses it>.
+//
+// A seed alone gives a different __NAME__: <the silhouette families, the
+// proportions, the colours and the details the seed rolls>.
+// Variety: __VARIETY__ (references/variety.md says what each level adds)
+//
+// Inputs:
+//   kind   0 rolls; 1 round, 2 tall, 3 squat
+//   tint   transparent rolls the colour; any other colour sets it
+// Outputs:
+//__OUTPUT_DOCS__
+//
+// This is a starting point: keep the structure (stream keys, the hashed
+// kind, shape and colour streams, distributions, a tone ramp, rows, the
+// outline) and replace the body with the real object.
+
+asset __NAME__ {
+  size __W__x__H__
+  origin __OX__, __OY__
+  input u32 kind = 0                // 0 rolls; 1 round, 2 tall, 3 squat
+  input color tint = #00000000      // transparent rolls one
+  //__OUTPUT_DECLS__
+
+  // Proportions cluster around the typical one; extremes stay rare.
+  const distribution typical = gaussian(mean = 0.5, sigma = 0.18)
+  // Silhouette families: round is common, squat is rare.
+  const distribution kinds = weighted {1: 50, 2: 35, 3: 15}
+  // Colour families, each a gradient: the seed picks a family, then a shade
+  // inside it. The last family is rare.
+  palette bodies = [#6a7a8c to #9aaabb, #7a5a3a to #a8805a, #4a6a3a to #7a9a5a]
+  const distribution families = weighted {0: 60, 1: 30, 2: 10}
+  // Where the prop stands and how large it may grow on this canvas, leaving
+  // room for the outline.
+  const f32 cx = __OX__.0
+  const f32 ground = __OY__.0
+  const f32 maxHalf = __HALF__.0
+  const f32 maxTall = __TALL__.0
+  // Stream keys, one per purpose: hash(start ^ key) seeds that purpose's
+  // stream, so a roll added to one never moves another. Keep them fixed
+  // once a game stores seeds; give a new purpose a new key.
+  const i32 kindKey = 0x2f6b9a13
+  const i32 shapeKey = 0x51ed2701
+  const i32 colorKey = 0x6c8e9cf5
+
+  draw {
+    start = seed                      // the game's seed, before any draw moves it
+
+    // A rolled kind hashes the seed, so it renders exactly like the same
+    // kind forced.
+    look = clamp(kind, 0, 3)
+    if (look == 0) { look = rolledKind(start) }
+
+    // The shape has a stream of its own and makes every roll, whatever the
+    // kind, so a forced kind keeps the seed's proportions.
+    stream_push(hash(start ^ shapeKey))
+    half = lerp(maxHalf * 0.55, maxHalf, 0.0 to 1.0 with typical)
+    tall = lerp(maxTall * 0.5, maxTall, 0.0 to 1.0 with typical)
+    lean = -1.5 to 1.5 with gaussian(mean = 0.0, sigma = 0.6)
+    markY = 0.3 to 0.7 with typical
+    stream_pop()
+    if (look == 2) { half = half * 0.7 }
+    if (look == 3) { tall = tall * 0.6 }
+
+    // Colours have a stream of their own too: a family, then a shade in it.
+    stream_push(hash(start ^ colorKey))
+    base = bodies[0 to 2 with families].pick()
+    marked = chance(0.3)
+    stream_pop()
+    if (tint.a != 0) { base = color.set.a(tint, 255) }
+    // Five tones from a cool shadow to a warm light; the outline is darker.
+    tones = stepper(color.mix(base, #1a2238, 0.5) to color.mix(base, #fff2c8, 0.45)).pick(5)
+    outline = color.mix(base, #0c1018, 0.75)
+
+    // The body is painted in rows into a layer, lit from the upper left, so
+    // its outline can come from its mask.
+    layer body(alpha = surface.source_over) {
+      rows = int(tall)
+      for r in 0..rows {
+        t = float(r) / float(max(rows - 1, 1))
+        w = half * sin(clamp(t * 1.2 + 0.15, 0.0, 1.0) * 1.5708)
+        x = cx + lean * (1.0 - t) - w
+        y = ground - tall + float(r)
+        rect(x, y, w, 1.0, tones[toneAt(0.95 - t * 0.5)])
+        rect(x + w, y, w, 1.0, tones[toneAt(0.55 - t * 0.55)])
+      }
+      if (marked) {
+        my = ground - tall * markY
+        rect(cx - half * 0.35, my, half * 0.7, 1.0, tones[0])
+      }
+    }
+    surface.paint(mask.expand(mask.from(body), 1), outline, blend = surface.source_over)
+    surface.paint(body, blend = surface.source_over)
+    //__OUTPUT_SETS__
+  }
+
+  // The kind a seed rolls: weighted, in a stream of its own.
+  rolledKind(start: i32) -> i32 {
+    stream_push(hash(start ^ kindKey))
+    look = 1 to 3 with kinds
+    stream_pop()
+    return look
+  }
+
+  // The tone at a lightness from 0 (shadow) to 1 (light).
+  toneAt(light: f32) -> i32 {
+    return int(clamp(light, 0.0, 1.0) * 4.0 + 0.5)
+  }
+}

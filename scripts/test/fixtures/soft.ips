@@ -1,0 +1,11 @@
+// Lint fixture: a blurred shape with soft, semi-transparent edges.
+asset Soft {
+  size 32x32
+  draw {
+    layer body(alpha=surface.source_over) {
+      oval(16, 16, 10, 8, #2a3a4a)
+      oval(16, 16, 9, 7, #7a8a9a)
+    }
+    surface.paint(body.blur(1.5), blend = surface.source_over)
+  }
+}

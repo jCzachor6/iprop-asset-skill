@@ -1,0 +1,2058 @@
+// wing.ips: one side of a butterfly seen from above: the hindwing, the
+// forewing that overlaps it, their shadows and the antenna.
+//
+// The root draws this part twice with one seed, the second time with
+// mirror_x, so both sides match to the pixel, and then body.ips once over
+// both. Local x = 0 is the body axis (root x = 128). Everything is rolled here from the seed: the silhouette
+// first, in its own stream, then the colours and the pattern of the style.
+//
+// Each wing is a closed Catmull-Rom outline of 96 points. Its colour field is
+// painted as outlines scaled about the wing root, so bands, borders and the
+// basal gradient follow the wing's own shape. Spots, eyespots, stripes, veins
+// and scale texture are positioned by outline index (between the veins) and
+// by the fraction f of the way from the root to the margin.
+//
+// Styles: 1 monarch, 2 swallowtail, 3 morpho, 4 white or sulphur, 5 peacock,
+// 6 admiral, 7 longwing, 8 fritillary, 9 blue, 10 emerald, 11 glasswing,
+// 12 satyr, 13 copper. A colour scheme recolours the style, often into
+// colours no real butterfly wears, and an abstract motif may go over it.
+
+import scales from "scales.ips"
+
+asset ButterflyWing {
+  size 128x256
+  origin 0,0
+  // 0 rolls the style or scheme from a hash of the seed, so a rolled one
+  // renders exactly like the same one chosen explicitly. Every program that
+  // calls this part with one seed resolves the same pair.
+  input u32 style = 0
+  input color tint = #00000000
+  input u32 shadow = 1
+  // Colour scheme over the style: 1 natural, 2 pastel, 3 neon, 4 dark,
+  // 5 light, 6 magic, 7 aberrant (the style's colours turned to a new hue),
+  // and the fantasy schemes: 8 gradient (a designed three-colour gradient),
+  // 9 duo (forewing and hindwing in two hues), 10 nebula (night clouds and
+  // stars), 11 opal, 12 flame, 13 frost, 14 prism (rainbow rings).
+  input u32 scheme = 0
+  // An abstract motif over the pattern: 1 none, 2 ripples, 3 marble,
+  // 4 filigree (glowing veins and lace), 5 stardust, 6 orbs, 7 sunburst,
+  // 8 shimmer (a holographic sheen), 9 pearls. 0 rolls one, like the scheme.
+  input u32 motif = 0
+  // 1 writes the outputs; the root's mirrored call passes 0, so the host
+  // keeps the right side's values.
+  input u32 report = 1
+  // 0 paints both wings (the single-program butterfly.ips); 1 only the
+  // forewing and the antenna, 2 only the hindwing with every ground shadow.
+  // 1 and 2 are separate programs composed by the host.
+  input u32 which = 0
+  // 1 spends a separate program's whole budget: finer gradients, a stronger
+  // blur and denser scale texture.
+  input u32 detail = 0
+
+  // For the root: the wing root on the body axis, the outer top corner of the
+  // drawing and its lowest point. The body part's data travels in points as
+  // well, the second value in y: span {fore, hind} wing lengths, build
+  // {thorax, abdomen} proportions, and the colour scheme for the body:
+  // shift {hue, saturation}, level {value, lift} and dusk {sink, motif};
+  // design {style, scheme} as resolved.
+  output point wingRoot
+  output point extent
+  output point foot
+  output point span
+  output point build
+  output point shift
+  output point level
+  output point dusk
+  output point design
+
+  // Per style (index style - 1): the wing's ground colour, its dark rim and
+  // two accents (bands, spots, eyespot rings).
+  palette grounds = [#c4520a to #f29a2a, #e6c445 to #f8eaa4, #1a44c8 to #3cacff,
+                     #ece6d6 to #fffaee, #8e2014 to #c84a1e, #1c1612 to #3a2c24,
+                     #140e0e to #2a2020, #c06a20 to #eaa452, #4c68d6 to #a2b8ff,
+                     #0e1612 to #1e2c26, #dce4e2 to #f4f8f4, #4a3424 to #8c6a46,
+                     #d0501a to #f28c30]
+  palette rims = [#0e0a08 to #1e1612, #0e0c0a to #1e1a14, #08091a to #1a1a28,
+                  #1c1c1c to #3e3a36, #2a1610 to #4a2c20, #0e0a08 to #1a1410,
+                  #0a0808 to #141010, #2a1608 to #4a2a12, #181828 to #36364c,
+                  #080c0a to #121a14, #1e1410 to #3a2418, #2a1c12 to #4a3424,
+                  #1a0e08 to #3a1e10]
+  palette accents = [#f4f0e4 to #fffef8, #0e1014 to #1e1e24, #eef2ff to #ffffff,
+                     #141414 to #2a2a2a, #e8b830 to #f8dc70, #d83a14 to #fa7024,
+                     #d02418 to #f25420, #1a1008 to #2e1c0c, #f4f4f4 to #ffffff,
+                     #2ac078 to #66f2b4, #f4f0e8 to #ffffff, #e2b852 to #f4d88a,
+                     #1a0e08 to #2c1a0e]
+  palette accents2 = [#f2a030 to #f8c060, #3a6ae8 to #7aa8ff, #f4f4ff to #ffffff,
+                      #f07818 to #f8a040, #2a5ac8 to #6a9aff, #f4f4f0 to #ffffff,
+                      #f2d02a to #fae878, #f0e2b0 to #faf2d6, #f2a030 to #f8c870,
+                      #c8a838 to #f0d468, #f08a30 to #f8b060, #f4f2ec to #ffffff,
+                      #f28030 to #f8a850]
+  palette hairs = [#1a1210 to #3a2a20, #1a1810 to #3a3220, #2a2018 to #5a4434,
+                   #8a8478 to #c8c2b2, #3a2418 to #6a4430, #2a201a to #4a3a2e,
+                   #120e0e to #2a2222, #6a5034 to #a8865c, #6a7088 to #a8b0c8,
+                   #141a16 to #2c3a30, #3a2a20 to #6a5040, #4a3828 to #7a6048,
+                   #4a2a18 to #7a4a2a]
+  palette sulphurs = [#f4dc54 to #fcee98, #e8f0c8 to #f6faea, #f4c858 to #fce6a0]
+  palette wingShades = [#000000, #1a1008, #ffffff]
+  // The gradient scheme's designed gradients (index aligned): the colour by
+  // the body, the middle one and the margin's, and the accents' hue in turns.
+  palette dawnDeep = [#3a0a4a to #4a1260, #071a3a to #0c2a4a, #5a1a3a to #6a2448,
+                      #4a3a8a to #5e4ca0, #1a5a34 to #246a40, #4a0a34 to #5e1242,
+                      #10164a to #1a205e, #0a3e40 to #10504e, #240606 to #340a0a,
+                      #0a2060 to #10307a, #263418 to #34441e, #2a0a4a to #3a1060,
+                      #f06a50 to #ff8064, #3a2a6a to #4a3880, #0a2a5a to #10366e,
+                      #4a1a2a to #5a2436]
+  palette dawnMid = [#e0457b to #f0608e, #18b59a to #2ad0b0, #ff9ec4 to #ffb4d2,
+                     #f290b8 to #f8a8c8, #a8d838 to #c0ea50, #f0306e to #ff4a84,
+                     #6a48f0 to #8060ff, #34d8a8 to #50e8bc, #d83818 to #f05024,
+                     #9038d8 to #a850ec, #c09464 to #d0a878, #20a8f0 to #40c0ff,
+                     #ffd36a to #ffe08a, #b48ae8 to #c4a0f4, #ff8a3a to #ff9e54,
+                     #e88a8a to #f09c9c]
+  palette dawnEdge = [#ffc46b to #ffd88a, #b4f0ff to #d8faff, #fff0f6 to #fffafc,
+                      #ffe0c0 to #fff0dc, #fff070 to #fff8a0, #ffc860 to #ffd880,
+                      #ff98d0 to #ffb0dc, #f8e49a to #fff0b8, #ffd060 to #ffe088,
+                      #ff6898 to #ff84ac, #ffcad8 to #ffdce6, #f8f0ff to #ffffff,
+                      #a8f0c0 to #c0ffd4, #ffd890 to #ffe4ac, #ffe0a0 to #fff0c4,
+                      #ffe2c0 to #fff0dc]
+  const list<f32> dawnAccent = [0.5, 0.86, 0.33, 0.45, 0.9, 0.5, 0.14, 0.95, 0.55, 0.15,
+                                0.36, 0.88, 0.6, 0.08, 0.55, 0.45]
+
+  const distribution styleMix = weighted {1: 9, 2: 9, 3: 8, 4: 9, 5: 7, 6: 8, 7: 7,
+                                          8: 8, 9: 7, 10: 6, 11: 4, 12: 8, 13: 6}
+  const distribution schemeMix = weighted {1: 10, 2: 8, 3: 8, 4: 6, 5: 6, 6: 9, 7: 5, 8: 14,
+                                           9: 8, 10: 7, 11: 7, 12: 5, 13: 5, 14: 7}
+  const distribution motifMix = weighted {1: 22, 2: 10, 3: 10, 4: 10, 5: 10, 6: 9, 7: 9, 8: 10, 9: 10}
+  const distribution typical = gaussian(mean=0.5, sigma=0.18)
+  const sampler<f32> wobble = sampler(-1.0 to 1.0 with gaussian(0.0, 0.5))
+  // Margin ends of the main veins and the gaps between them (outline index).
+  const list<f32> foreGaps = [25.5, 28.5, 32.0, 37.0, 43.0, 48.5, 53.5, 59.0]
+  const list<f32> hindGaps = [22.5, 29.5, 35.0, 41.0, 46.5, 51.5, 58.0]
+
+  // Stream keys, one per purpose: hash(seed ^ key) seeds that purpose's stream.
+  // Keep them fixed once a game stores seeds.
+  const i32 styleKey = 0x2f6b9a13
+  const i32 schemeKey = 0x4f1bbcdd
+  const i32 motifKey = 0x1b03738b
+  const i32 hairKey = 0x6c62272e        // body.ips rolls the same hair from the same key and seed
+  const i32 shapeKey = 0x51ed2701
+  const i32 colorKey = 0x2545f491
+  const i32 detailKey = 0x3c6ef372
+  // Every painted detail XORs a key of its own onto the detail seed, one per
+  // wing. The soft and the sharp pass of a motif share its key: they draw the
+  // same motif.
+  const i32 hindFieldKey = 0x0b4f2a91
+  const i32 foreFieldKey = 0x3e5c7d19
+  const i32 hindDetailKey = 0x1b873593
+  const i32 foreDetailKey = 0x2c1b3c6d
+  const i32 hindMottleKey = 0x0e4f1a77
+  const i32 foreMottleKey = 0x61c88647
+  const i32 hindFlameKey = 0x6b43a9b5
+  const i32 foreFlameKey = 0x2f1e8c3d
+  const i32 hindSpotKey = 0x5bd1e995
+  const i32 foreSpotKey = 0x1b56c4e9
+  const i32 hindMotifKey = 0x5851f42d
+  const i32 foreMotifKey = 0x14057b7e
+  const i32 stripeKey = 0x297a2d39
+  const i32 scaleKey = 0x5f356495
+  const i32 hindRowKey = 0x3a2f9c15
+  const i32 foreRowKey = 0x7b1d4e83
+  const i32 hindGlintKey = 0x2d7f9a41
+  const i32 foreGlintKey = 0x7c3b2e19
+  const i32 hindGrainKey = 0x68e31da4
+  const i32 foreGrainKey = 0x4cf5ad43
+  const i32 hindHairKey = 0x7feb352d
+  const i32 foreHairKey = 0x6a09e667
+  const i32 innerHairKey = 0x1f83d9ab
+
+  draw {
+    look = clamp(int(style), 1, 13)
+    if (style == 0) {
+      stream_push(hash(seed ^ styleKey))
+      look = 1 to 13 with styleMix
+      stream_pop()
+    }
+    rolledScheme = clamp(int(scheme), 1, 14)
+    if (scheme == 0) {
+      stream_push(hash(seed ^ schemeKey))
+      rolledScheme = 1 to 14 with schemeMix
+      stream_pop()
+    }
+    rolledMotif = clamp(int(motif), 1, 9)
+    if (motif == 0) {
+      stream_push(hash(seed ^ motifKey))
+      rolledMotif = 1 to 9 with motifMix
+      stream_pop()
+    }
+    // The hair colour is shared with body.ips, which hashes the same seed.
+    stream_push(hash(seed ^ hairKey))
+    hair = hairs[look - 1].pick()
+    stream_pop()
+
+    // ---- silhouette: its own stream, so colours never move it ------------
+    stream_push(hash(seed ^ shapeKey))
+    size = 0.80 to 1.0 with beta(2.2, 1.3)
+    foreAngle = 22.0 to 52.0 with gaussian(37.0, 6.0)
+    tornusAngle = -14.0 to 24.0 with gaussian(6.0, 7.0)
+    tornusDist = 0.56 to 0.80 with gaussian(0.68, 0.05)
+    costaBulge = 0.0 to 0.06 with gaussian(0.025, 0.015)
+    hook = 0.0
+    if (chance(0.15)) { hook = 0.02 to 0.09 }
+    convex = -0.05 to 0.12 with gaussian(0.04, 0.04)
+    innerBulge = -0.03 to 0.06 with gaussian(0.02, 0.02)
+    apexRound = 0.0 to 0.10 with beta(2.0, 2.0, 0.0, 0.10)
+    hindRatio = 0.56 to 0.86 with gaussian(0.70, 0.06)
+    hindTurn = -16.0 to 12.0 with gaussian(-2.0, 6.0)
+    hindWide = 0.82 to 1.18 with gaussian(1.0, 0.08)
+    hindTall = 0.80 to 1.25 with gaussian(1.0, 0.09)
+    hindLobe = -0.10 to 0.22 with gaussian(0.04, 0.07)
+    jit = wobble.pick(16)
+    scallop = 0.0
+    if (chance(0.4)) { scallop = 0.01 to 0.05 }
+    scallopCount = float(5 to 9)
+    foreScallop = 0.0
+    if (chance(0.08)) { foreScallop = 0.008 to 0.025 }
+    tailRoll = 0.15 to 0.45
+    tailChance = 0.0 to 1.0
+    tailAt = 46.0 to 51.0
+    tailBend = -1.05 to -0.55
+    thorax = 0.11 to 0.16
+    abdomen = 0.62 to 0.86 with gaussian(0.74, 0.06)
+    antenna = 0.38 to 0.62 with gaussian(0.5, 0.06)
+    antennaAngle = 55.0 to 80.0
+    stream_pop()
+
+    // Styles bend the rolled silhouette, without new draws: swallowtails
+    // carry tails, longwings have narrow forewings, blues stay small.
+    tail = 0.0
+    if (tailChance < 0.12 || (look == 2 && tailChance < 0.85) || (look == 10 && tailChance < 0.5)) {
+      tail = tailRoll
+    }
+    if (look == 7) {
+      tornusDist = tornusDist * 0.78
+      hindRatio = hindRatio * 0.86
+      hindTall = hindTall * 0.88
+    }
+    if (look == 9 || look == 13) { size = size * 0.86 }
+    if (look == 3 || look == 10) { size = min(1.0, size * 1.06) }
+
+    // ---- outline keys in units of the wing length --------------------------
+    fe = dir(foreAngle)
+    fw = {-fe.y, fe.x}
+    apex = fe
+    torn = dir(-tornusAngle) * tornusDist
+    edge = torn - apex
+    out = vec2.normalize({edge.y, -edge.x})
+    if (vec2.dot(out, apex) < 0.0) { out = -out }
+    inner = vec2.normalize({torn.y, -torn.x})
+    if (inner.y < 0.0) { inner = -inner }
+    foreUnit = [
+      {0.0, 0.0},
+      fe * 0.5 - fw * costaBulge,
+      fe * (1.0 - apexRound) + fw * (apexRound * 0.4),
+      apex + edge * 0.26 + out * (convex * 0.6 - hook),
+      apex + edge * 0.64 + out * convex,
+      torn,
+      torn * 0.5 + inner * innerBulge,
+      fe * 0.04 + fw * 0.08,
+    ]
+    hindUnit = [
+      {0.0, 0.0},
+      hindKey({0.40, -0.16}, hindTurn, hindWide, hindTall, {jit[2], jit[3]} * 0.03),
+      hindKey({0.80, -0.06}, hindTurn, hindWide, hindTall, {jit[4], jit[5]} * 0.04),
+      hindKey({0.98, 0.30}, hindTurn, hindWide, hindTall, {jit[6], jit[7]} * 0.04),
+      hindKey({0.80, 0.68}, hindTurn, hindWide, hindTall, {jit[8], jit[9]} * 0.04),
+      hindKey({0.42, 0.95 + hindLobe}, hindTurn, hindWide, hindTall, {jit[10], jit[11]} * 0.04),
+      hindKey({0.10, 0.62}, hindTurn, hindWide, hindTall, {jit[12], jit[13]} * 0.02),
+      hindKey({0.03, 0.18}, hindTurn, hindWide, hindTall, {0.0, 0.0}),
+    ]
+
+    // ---- fit both wings, the tail, the body and the antenna -----------------
+    gap = 0.035
+    rootX = 2.5
+    fMinY = 0.0
+    fMaxX = 0.0
+    hMaxY = 0.0
+    hMaxX = 0.0
+    for i in 0..8 {
+      fMinY = min(fMinY, foreUnit[i].y)
+      fMaxX = max(fMaxX, foreUnit[i].x)
+      hMaxY = max(hMaxY, hindUnit[i].y)
+      hMaxX = max(hMaxX, hindUnit[i].x)
+    }
+    antTop = thorax + 0.09 + antenna * sin(antennaAngle * 0.0174533)
+    top = max(-fMinY * 1.04, antTop) + gap
+    bottom = max(hindRatio * (hMaxY * 1.04 + tail * 0.8), thorax * 0.75 + abdomen * hindRatio) + gap
+    widthUnit = max(fMaxX * 1.04, hindRatio * (hMaxX * 1.06 + tail * 0.3))
+    fore = min((121.0 - rootX) / widthUnit, 244.0 / (top + bottom)) * size
+    hind = fore * hindRatio
+    rootY = 128.0 + (top - bottom) * fore * 0.5
+    fr = {rootX, rootY - gap * fore}
+    hr = {rootX, rootY + gap * fore}
+    if (report == 1) {
+      wingRoot = {0.0, rootY}
+      extent = {rootX + widthUnit * fore, rootY - top * fore}
+      foot = {0.0, rootY + bottom * fore}
+      span = {fore, hind}
+      build = {thorax, abdomen}
+    }
+
+    fk = placed(foreUnit, fr, fore)
+    hk = placed(hindUnit, hr, hind)
+    foreLine = outline(fk, [0.25, 0.625, foreScallop * fore, scallopCount])
+    hindLine = outline(hk, [0.25, 0.75, scallop * hind, scallopCount])
+    tailBase = at(hindLine, hr, tailAt, 0.92)
+    tailDir = vec2.rot(vec2.normalize(tailBase - hr), tailBend)
+    tailTip = tailBase + tailDir * (tail * hind)
+    tailWidth = hind * (0.065 to 0.095)
+
+    // ---- colour and pattern: a stream of their own --------------------------
+    stream_push(hash(seed ^ colorKey))
+    ground = grounds[look - 1].pick()
+    sulphur = sulphurs[index(3)].pick()
+    if (look == 4 && chance(0.45)) { ground = sulphur }
+    if (tint.a != 0) { ground = color.mix(tint, ground, 0.12) }
+    rim = rims[look - 1].pick()
+    accent = accents[look - 1].pick()
+    accent2 = accents2[look - 1].pick()
+    // The ground deepens towards the body; the outer field may warm or cool.
+    deep = color.mix(ground, hair, 0.25 to 0.55 with typical)
+    outer = color.shade(ground, -4 to 10)
+    hindGround = color.mix(ground, color.shade(ground, -18), 0.0 to 0.5 with beta(1.5, 3.0))
+    deepHind = color.mix(hindGround, hair, 0.30 to 0.60 with typical)
+
+    // Defaults: plain wing, thin dark veins, a light hairy base.
+    foreRim = 0.0 to 0.05 with beta(1.5, 3.0, 0.0, 0.05)
+    hindRim = foreRim
+    rimStroke = 0.0
+    veinWidth = fore * (0.008 to 0.014)
+    veinColor = color.set.a(color.mix(rim, deep, 0.3), 120 to 190)
+    basalF = 0.20 to 0.34
+    basalAmount = 0.35 to 0.75 with typical
+    bandColor = accent
+    bandLo = 2.0
+    bandHi = 2.0
+    hindBandLo = 2.0
+    hindBandHi = 2.0
+    hindBandColor = accent2
+    marginRows = 0
+    marginColor = accent
+    marginSize = fore * (0.022 to 0.034)
+    apexPatch = 0.0
+    apexColor = rim
+    subapical = 0
+    subapicalColor = accent
+    foreEyes = 0
+    hindEyes = 0
+    eyeSize = fore * (0.045 to 0.075)
+    eyeRing = accent
+    eyePupil = accent2
+    stripes = 0
+    stripeColor = accent
+    diag = 0
+    diagColor = accent
+    diagWidth = fore * (0.10 to 0.17)
+    diagCosta = 13.0 to 18.0
+    diagEnd = 54.0 to 64.0
+    diagBow = 0.52 to 0.70
+    hindDiag = 0
+    spotRows = 0
+    spotColor = rim
+    discal = 0
+    sheen = 0.0
+    sheenColor = color.shade(ground, 40)
+    glass = 0
+    rays = 0
+    rayColor = accent2
+    analEye = 0
+    blueRow = 0
+    lines = 0
+    mottle = 0.15 to 0.45
+    texture = 0.5 to 1.0
+    fringeLight = color.mix(ground, #f4f0e6, 0.5 to 0.9)
+    fringeDark = color.mix(rim, ground, 0.0 to 0.3)
+    checker = chance(0.5)
+    antennaTip = color.shade(hair, 30 to 70)
+
+    // Every style reads the same rolls, so forcing a style never moves them.
+    rollA = 0.0 to 1.0
+    rollB = 0.0 to 1.0
+    rollC = 0.0 to 1.0
+    variety = 0.0 to 1.0
+    gloss = 0.10 to 0.22
+    // The scheme's rolls, drawn whatever the scheme.
+    hueSpin = 0.0 to 1.0
+    hueSpread = 0.12 to 0.45
+    accentTurn = pick(0.5, 0.33, 0.67, 0.0)
+    schemeDepth = 0.0 to 1.0 with beta(2.0, 2.0)
+    if (look == 1) {
+      // Monarch, queen or viceroy: black veins, black rim with white dots.
+      foreRim = 0.10 to 0.15
+      hindRim = foreRim * (0.9 to 1.2)
+      veinWidth = fore * (0.014 to 0.024)
+      if (rollA < 0.25) { veinWidth = veinWidth * 0.55 }
+      veinColor = rim
+      marginRows = 2
+      marginSize = fore * (0.018 to 0.026)
+      apexPatch = 0.30 to 0.42
+      subapical = 1
+      subapicalColor = color.mix(accent, accent2, 0.0 to 0.7 with beta(1.0, 3.0))
+      if (rollB < 0.3) { lines = 1 }
+      deep = color.mix(ground, hair, 0.10 to 0.30)
+      checker = 1
+    } else if (look == 2) {
+      // Swallowtail: tiger stripes, dark base, yellow lunules, blue haze.
+      foreRim = 0.16 to 0.24
+      hindRim = 0.22 to 0.32
+      stripes = 3 to 5
+      stripeColor = rim
+      deep = color.mix(rim, ground, 0.0 to 0.35)
+      basalF = 0.26 to 0.40
+      basalAmount = 0.85 to 1.0
+      marginRows = 1
+      marginColor = color.mix(ground, #ffffff, 0.15)
+      marginSize = fore * (0.030 to 0.042)
+      blueRow = 1
+      analEye = 1
+      veinColor = color.set.a(rim, 230)
+      veinWidth = fore * (0.011 to 0.016)
+    } else if (look == 3) {
+      // Morpho: electric blue with a sheen, black apex, white apex spots.
+      foreRim = 0.03 to 0.08
+      hindRim = foreRim
+      apexPatch = 0.26 to 0.42
+      subapical = 1
+      subapicalColor = accent
+      sheen = 0.7 to 1.0
+      sheenColor = color.mix(ground, #c8f0ff, 0.5)
+      outer = color.shade(ground, 18 to 34)
+      deep = color.mix(ground, #101a48, 0.35 to 0.65)
+      veinColor = color.set.a(rim, 90 to 150)
+      if (rollA < 0.4) { marginRows = 1; marginColor = accent; marginSize = fore * 0.02 }
+    } else if (look == 4) {
+      // Whites and sulphurs: black or orange tip, a dark spot or two.
+      foreRim = 0.0
+      hindRim = 0.0
+      veinColor = color.set.a(color.mix(rim, ground, 0.55), 70 to 130)
+      deep = color.mix(ground, #8a8c84, 0.2 to 0.45)
+      if (rollA < 0.7) { apexPatch = 0.22 to 0.36 }
+      if (rollB < 0.3) {
+        apexPatch = 0.42 to 0.52
+        apexColor = accent2
+        subapical = 2
+        subapicalColor = rim
+      }
+      discal = 1 to 2
+      if (rollC < 0.25) { discal = 0 }
+      spotColor = rim
+      fringeLight = color.mix(ground, #ffffff, 0.6)
+      mottle = 0.05
+    } else if (look == 5) {
+      // Peacock: rusty field, one great eyespot on each wing.
+      foreRim = 0.05 to 0.10
+      hindRim = 0.10 to 0.16
+      foreEyes = 1
+      hindEyes = 1
+      eyeSize = fore * (0.11 to 0.15)
+      eyeRing = accent
+      eyePupil = accent2
+      hindGround = color.mix(ground, rim, 0.35 to 0.65)
+      deepHind = color.mix(hindGround, hair, 0.5)
+      stripes = 2 to 3
+      stripeColor = rim
+      checker = 1
+    } else if (look == 6) {
+      // Admiral: a bright band across a dark wing, white apex spots.
+      diag = 1
+      diagColor = accent
+      subapical = 1
+      subapicalColor = accent2
+      hindBandLo = 0.80 to 0.86
+      hindBandHi = 0.95
+      hindBandColor = accent
+      marginRows = 1
+      marginColor = rim
+      marginSize = fore * 0.02
+      analEye = 2
+      foreRim = 0.0
+      hindRim = 0.02
+      checker = 1
+    } else if (look == 7) {
+      // Longwing: black with a red base, a yellow band or red rays.
+      diag = 1
+      diagColor = accent2
+      diagWidth = fore * (0.11 to 0.16)
+      diagCosta = 17.0 to 21.0
+      diagEnd = 44.0 to 52.0
+      diagBow = 0.68 to 0.80
+      deep = accent
+      basalF = 0.40 to 0.55
+      basalAmount = 1.0
+      if (rollA < 0.5) {
+        rays = 1
+        rayColor = accent
+        diagColor = color.mix(accent2, #ffffff, 0.3)
+      } else {
+        hindDiag = 1
+      }
+      if (rollB < 0.4) { marginRows = 1; marginColor = #f4f0e0; marginSize = fore * 0.016 }
+    } else if (look == 8) {
+      // Fritillary: rows of black spots and chevrons, checkered fringe.
+      spotRows = 4
+      spotColor = rim
+      discal = 3
+      foreRim = 0.04 to 0.07
+      hindRim = foreRim
+      marginRows = 1
+      marginColor = rim
+      checker = 1
+      deep = color.mix(ground, #3a3a20, 0.4 to 0.7)
+      veinColor = color.set.a(rim, 150 to 210)
+      if (rollA < 0.4) { hindBandLo = 0.45; hindBandHi = 0.58; hindBandColor = color.mix(ground, #f8e8c0, 0.5) }
+    } else if (look == 9) {
+      // Blue: violet sheen, thin dark rim, white fringe, small black dots.
+      rimStroke = fore * (0.025 to 0.05)
+      foreRim = 0.0
+      hindRim = 0.0
+      sheen = 0.4 to 0.7
+      sheenColor = color.mix(ground, #e8f0ff, 0.5)
+      fringeLight = #f8f8f6
+      fringeDark = color.mix(rim, #ffffff, 0.4)
+      checker = 0
+      if (rollA < 0.6) { marginRows = 1; marginColor = rim; marginSize = fore * 0.026 }
+      if (rollB < 0.35) { hindBandLo = 0.80; hindBandHi = 0.90; hindBandColor = accent2 }
+      deep = color.mix(ground, #4a4a6a, 0.3 to 0.5)
+      veinColor = color.set.a(rim, 60 to 110)
+    } else if (look == 10) {
+      // Emerald and birdwing: black with iridescent green.
+      diag = 1
+      diagColor = accent
+      diagWidth = fore * (0.16 to 0.24)
+      hindDiag = 1
+      sheen = 0.4 to 0.7
+      sheenColor = color.mix(accent, #ffffff, 0.4)
+      if (rollA < 0.45) {
+        // Birdwing: green outer field, black veins, black basal half.
+        diag = 0
+        hindDiag = 0
+        outer = accent
+        deep = rim
+        basalF = 0.55 to 0.65
+        basalAmount = 1.0
+        veinColor = rim
+        veinWidth = fore * (0.016 to 0.022)
+        hindGround = color.mix(accent, accent2, 0.3 to 0.9)
+        deepHind = rim
+      }
+      if (rollB < 0.4) { marginRows = 1; marginColor = accent; marginSize = fore * 0.024 }
+    } else if (look == 11) {
+      // Glasswing: clear panes inside a brown rim, a white bar near the apex.
+      glass = 1
+      rimStroke = fore * (0.05 to 0.08)
+      subapical = 3
+      subapicalColor = accent
+      veinColor = color.set.a(rim, 160 to 220)
+      veinWidth = fore * (0.008 to 0.011)
+      fringeLight = color.mix(rim, accent2, 0.5)
+      mottle = 0.0
+      texture = 0.2
+    } else if (look == 12) {
+      // Satyr: brown, eyespots with white pupils, wavy lines, mottling.
+      foreEyes = 1 to 2
+      hindEyes = 2 to 5
+      eyeSize = fore * (0.04 to 0.07)
+      eyeRing = accent
+      eyePupil = accent2
+      lines = 2
+      mottle = 0.6 to 1.0
+      foreRim = 0.03 to 0.08
+      hindRim = foreRim
+      if (rollA < 0.35) { hindBandLo = 0.55; hindBandHi = 0.80; hindBandColor = color.mix(ground, accent, 0.35) }
+    } else {
+      // Copper: fiery forewing with black spots, dark hindwing, orange rim band.
+      spotRows = 2
+      discal = 2
+      spotColor = accent
+      foreRim = 0.07 to 0.11
+      hindRim = 0.04
+      hindGround = color.mix(ground, rim, 0.6 to 0.85)
+      deepHind = rim
+      hindBandLo = 0.80
+      hindBandHi = 0.94
+      hindBandColor = accent2
+      sheen = 0.2 to 0.5
+      sheenColor = color.shade(ground, 40)
+    }
+
+    // A rare extra makes even one style vary: a stray eyespot, spots or rays.
+    if (variety < 0.10 && foreEyes == 0) { foreEyes = 1; eyeSize = fore * 0.05; eyeRing = color.mix(accent2, #f8d050, 0.5); eyePupil = #f4f4f4 }
+    else if (variety < 0.18 && spotRows == 0) { spotRows = 1; spotColor = color.mix(rim, ground, 0.2) }
+    else if (variety < 0.24 && rays == 0) { rays = 1; rayColor = color.mix(ground, rim, 0.5) }
+    // Every wing catches a little light across its middle.
+    if (sheen < gloss) {
+      sheen = gloss
+      sheenColor = color.shade(ground, 26)
+    }
+    // ---- colour scheme: one recolouring over every colour role ------------
+    // Fields (F), accents (A) and the rim (R) each get a hue turn, a
+    // saturation and value scale and a lift towards white or black. The
+    // fantasy schemes then paint the fields from hue, saturation and value.
+    // Their rolls are drawn whatever the scheme, so forcing one moves nothing.
+    dawn = index(16)
+    dawnLow = dawnDeep[dawn].pick()
+    dawnMiddle = dawnMid[dawn].pick()
+    dawnHigh = dawnEdge[dawn].pick()
+    dawnFlip = chance(0.3)
+    hueNudge = -0.04 to 0.04
+    duoTurn = pick(0.5, 0.33, -0.33, 0.25, -0.25)
+    flameHue = pick(0.0, 0.0, 0.56, 0.78, 0.33, 0.9) + (-0.02 to 0.02)
+    prismTurns = 0.45 to 1.0
+    prismBack = chance(0.5)
+    // Veins show faintly: a soft line under the blur and, with detail, a
+    // translucent hairline over it.
+    veinFade = 0.30 to 0.55
+    kind = rolledScheme
+    if (tint.a != 0) { kind = 1 }
+    hairHue = hueOf(hair)
+    prism = 0.0
+    fire = #00000000
+    tones = 0
+    stars = 60
+    lightVeins = 0
+    hueF = 0.0
+    hueOuter = 0.0
+    hueA = 0.0
+    satF = 1.0
+    satA = 1.0
+    valF = 1.0
+    valA = 1.0
+    liftF = 0.0
+    liftA = 0.0
+    liftR = 0.0
+    sinkF = 0.0
+    sparkle = 0
+    // A wash of the scheme's own hue, so even black or grey grounds take it.
+    hueBase = color.hsv(#e8584a, hueSpin, 1.0, 1.0)
+    wash = hueBase
+    washAmount = 0.0
+    if (kind == 2) {
+      // Pastel: any hue, chalky and light, rims softened into the ground.
+      hueF = hueSpin
+      hueOuter = hueSpin + hueSpread * 0.5
+      hueA = hueSpin + accentTurn
+      satF = 1.15 + schemeDepth * 0.35
+      satA = 1.2
+      liftF = 0.30 + schemeDepth * 0.14
+      liftA = 0.24
+      liftR = 0.38
+      rim = color.mix(rim, ground, 0.45)
+      wash = color.mix(hueBase, #ffffff, 0.5)
+      washAmount = 0.22 + schemeDepth * 0.12
+    } else if (kind == 3) {
+      // Neon: saturated, bright, accents opposite on the wheel, black rims.
+      hueF = hueSpin
+      hueOuter = hueSpin + hueSpread * 0.4
+      hueA = hueSpin + 0.5
+      satF = 1.9
+      satA = 1.9
+      valF = 1.2 + schemeDepth * 0.2
+      valA = 1.35
+      sheen = max(sheen, 0.45)
+    } else if (kind == 4) {
+      // Dark: deep jewel tones, the accents left to glow against them.
+      hueF = hueSpin
+      hueOuter = hueSpin + hueSpread * 0.3
+      hueA = hueSpin + accentTurn
+      satF = 1.2
+      valF = 0.42 + schemeDepth * 0.15
+      sinkF = 0.1
+      satA = 1.2
+      valA = 1.1
+      liftA = 0.12
+    } else if (kind == 5) {
+      // Light: ivory and frost, colour only in the accents.
+      hueF = hueSpin
+      hueOuter = hueSpin
+      hueA = hueSpin + accentTurn
+      satF = 0.9
+      liftF = 0.46 + schemeDepth * 0.14
+      liftR = 0.46
+      satA = 1.3
+      liftA = 0.08
+      wash = color.mix(hueBase, #ffffff, 0.72)
+      washAmount = 0.2
+    } else if (kind == 6) {
+      // Magic: the hue turns from base to margin, a strong sheen and glints.
+      hueF = hueSpin
+      hueOuter = hueSpin + hueSpread
+      hueA = hueSpin + 0.5
+      satF = 1.5
+      valF = 1.15
+      satA = 1.4
+      valA = 1.25
+      sheen = max(sheen, 0.8)
+      sparkle = 1
+    } else if (kind == 7) {
+      // Aberrant: the style's own pattern in another hue.
+      hueF = hueSpin
+      hueOuter = hueSpin
+      hueA = hueSpin
+    } else if (kind == 8) {
+      // Gradient: a designed gradient from the body to the margin; the
+      // accents turn to the hue chosen for it.
+      hueF = hueOf(dawnLow) - hairHue
+      satF = 1.4
+      hueA = dawnAccent[dawn] + hueNudge - hueOf(accent)
+      satA = 1.3
+      valA = 1.15
+      liftA = 0.05
+    } else if (kind == 9) {
+      // Duo: the forewing in one hue, the hindwing in another.
+      hueF = hueSpin - hairHue
+      satF = 1.3
+      hueA = hueSpin + duoTurn * 0.5 + 0.5 - hueOf(accent)
+      satA = 1.3
+      valA = 1.2
+    } else if (kind == 10) {
+      // Nebula: night-dark wings, glowing clouds, stars, neon accents.
+      hueF = hueSpin - hairHue
+      satF = 1.3
+      valF = 0.6
+      hueA = hueSpin + accentTurn - hueOf(accent)
+      satA = 1.6
+      valA = 1.35
+      sparkle = 1
+      stars = 150
+      mottle = 1.0
+      tones = 2
+    } else if (kind == 11) {
+      // Opal: pearly white with every colour drifting through it.
+      hueF = hueSpin - hairHue
+      satF = 0.8
+      liftF = 0.45
+      liftR = 0.5
+      hueA = hueSpin + accentTurn - hueOf(accent)
+      satA = 0.9
+      valA = 1.1
+      liftA = 0.25
+      sparkle = 1
+      tones = 1
+      mottle = max(mottle, 0.6)
+    } else if (kind == 12) {
+      // Flame: from embers by the body to a bright margin.
+      hueF = flameHue - hairHue
+      satF = 1.5
+      valF = 0.8
+      hueA = flameHue + 0.13 - hueOf(accent)
+      satA = 1.1
+      valA = 1.3
+      sparkle = 1
+      stars = 90
+    } else if (kind == 13) {
+      // Frost: white and ice, light veins, glints.
+      hueF = 0.5 + hueSpin * 0.25 - hairHue
+      satF = 0.8
+      liftF = 0.5
+      liftR = 0.3
+      hueA = 0.52 + hueSpin * 0.25 - hueOf(accent)
+      satA = 1.2
+      valA = 1.1
+      lightVeins = 1
+      sparkle = 1
+    } else if (kind == 14) {
+      // Prism: the hue turns ring by ring from the body to the margin.
+      hueF = hueSpin - hairHue
+      satF = 1.3
+      hueA = hueSpin + 0.5 - hueOf(accent)
+      satA = 1.3
+      valA = 1.2
+      prism = prismTurns
+      if (prismBack == 1) { prism = -prismTurns }
+    }
+    if (kind > 7) { hueOuter = hueF }
+    if (kind > 1) {
+      ground = recolor(ground, hueF, satF, valF, liftF, sinkF)
+      deep = recolor(deep, hueF, satF, valF, liftF * 0.7, sinkF)
+      outer = recolor(outer, hueOuter, satF, valF, liftF, sinkF)
+      hindGround = recolor(hindGround, hueOuter, satF, valF, liftF, sinkF)
+      deepHind = recolor(deepHind, hueF, satF, valF, liftF * 0.7, sinkF)
+      sheenColor = recolor(sheenColor, hueOuter + 0.08, satF, valF, liftF, 0.0)
+      hair = recolor(hair, hueF, satF * 0.8, valF, liftF * 0.6, sinkF)
+      rim = recolor(rim, hueF, satF, 1.0, liftR, 0.0)
+      veinColor = recolor(veinColor, hueF, satF, 1.0, liftR * 0.8, 0.0)
+      fringeLight = recolor(fringeLight, hueOuter, satF, valF, liftF, 0.0)
+      fringeDark = recolor(fringeDark, hueF, satF, 1.0, liftR, 0.0)
+      accent = recolor(accent, hueA, satA, valA, liftA, 0.0)
+      accent2 = recolor(accent2, hueA + 0.12, satA, valA, liftA, 0.0)
+      eyeRing = recolor(eyeRing, hueA, satA, valA, liftA, 0.0)
+      eyePupil = recolor(eyePupil, hueA + 0.1, satA, valA, liftA, 0.0)
+      bandColor = recolor(bandColor, hueA, satA, valA, liftA, 0.0)
+      hindBandColor = recolor(hindBandColor, hueA, satA, valA, liftA, 0.0)
+      diagColor = recolor(diagColor, hueA, satA, valA, liftA, 0.0)
+      apexColor = recolor(apexColor, hueA, satA, valA, liftA, 0.0)
+      subapicalColor = recolor(subapicalColor, hueA, satA, valA, liftA, 0.0)
+      marginColor = recolor(marginColor, hueA, satA, valA, liftA, 0.0)
+      spotColor = recolor(spotColor, hueA, satA, valA, liftA, 0.0)
+      rayColor = recolor(rayColor, hueA, satA, valA, liftA, 0.0)
+      stripeColor = recolor(stripeColor, hueA, satA, valA, liftA, 0.0)
+      antennaTip = recolor(antennaTip, hueA, satA, valA, liftA, 0.0)
+    }
+    if (washAmount > 0.0) {
+      ground = color.mix(ground, wash, washAmount)
+      deep = color.mix(deep, wash, washAmount * 0.8)
+      outer = color.mix(outer, wash, washAmount)
+      hindGround = color.mix(hindGround, wash, washAmount)
+      deepHind = color.mix(deepHind, wash, washAmount * 0.8)
+      rim = color.mix(rim, wash, washAmount * 0.6)
+    }
+    sparkleColor = color.mix(accent2, #ffffff, 0.6)
+    if (kind == 8) {
+      low = color.hsv(dawnLow, hueNudge, 1.0, 1.0)
+      high = color.hsv(dawnHigh, hueNudge, 1.0, 1.0)
+      ground = color.hsv(dawnMiddle, hueNudge, 1.0, 1.0)
+      deep = low
+      outer = high
+      if (dawnFlip == 1) {
+        deep = high
+        outer = low
+      }
+      deepHind = deep
+      hindGround = color.mix(ground, outer, 0.7)
+      sheenColor = ground
+      sheen = 1.2
+      fringeLight = color.mix(high, #ffffff, 0.4)
+    } else if (kind == 9) {
+      other = hueSpin + duoTurn
+      vivid = 0.55 + schemeDepth * 0.4
+      deep = hsvColor(hueSpin + 0.03, min(vivid + 0.2, 1.0), 0.38)
+      ground = hsvColor(hueSpin, vivid, 0.92)
+      outer = hsvColor(hueSpin - 0.03, vivid * 0.7, 1.0)
+      deepHind = hsvColor(other + 0.03, min(vivid + 0.2, 1.0), 0.38)
+      hindGround = hsvColor(other, vivid, 0.95)
+      sheenColor = hsvColor(hueSpin + duoTurn * 0.5, 0.35, 1.0)
+      sheen = 0.5
+      fringeLight = color.mix(outer, #ffffff, 0.5)
+    } else if (kind == 10) {
+      deep = hsvColor(hueSpin, 0.9, 0.08)
+      ground = hsvColor(hueSpin + 0.04, 0.85, 0.22 + schemeDepth * 0.12)
+      outer = hsvColor(hueSpin + hueSpread, 0.8, 0.45 + schemeDepth * 0.2)
+      deepHind = deep
+      hindGround = hsvColor(hueSpin + hueSpread * 0.6, 0.8, 0.4 + schemeDepth * 0.15)
+      sheenColor = hsvColor(hueSpin + hueSpread + 0.15, 0.55, 1.0)
+      sheen = 0.7
+      rim = hsvColor(hueSpin, 0.7, 0.05)
+      fringeLight = color.mix(sheenColor, #ffffff, 0.3)
+      sparkleColor = color.mix(#fff4d8, sheenColor, 0.2)
+    } else if (kind == 11) {
+      ground = hsvColor(hueSpin, 0.16 + schemeDepth * 0.12, 0.98)
+      deep = hsvColor(hueSpin + 0.5, 0.38, 0.9)
+      outer = hsvColor(hueSpin + 0.25, 0.26, 1.0)
+      deepHind = hsvColor(hueSpin + 0.65, 0.38, 0.9)
+      hindGround = hsvColor(hueSpin + 0.15, 0.24, 1.0)
+      sheenColor = hsvColor(hueSpin + 0.35, 0.5, 1.0)
+      sheen = 1.2
+      fringeLight = #fffcf8
+      sparkleColor = #ffffff
+    } else if (kind == 12) {
+      // Embers by the body, bright fire at the margin, tongues of flame.
+      deep = hsvColor(flameHue - 0.02, 1.0, 0.32)
+      ground = hsvColor(flameHue + 0.03, 1.0, 0.85)
+      outer = hsvColor(flameHue + 0.11, 1.0, 1.0)
+      deepHind = deep
+      hindGround = hsvColor(flameHue + 0.06, 0.95, 0.95)
+      sheenColor = hsvColor(flameHue + 0.05, 1.0, 1.0)
+      sheen = 0.8
+      fire = hsvColor(flameHue + 0.14, 0.45, 1.0)
+      rim = hsvColor(flameHue - 0.02, 1.0, 0.12)
+      fringeLight = hsvColor(flameHue + 0.13, 0.5, 1.0)
+      sparkleColor = hsvColor(flameHue + 0.13, 0.45, 1.0)
+    } else if (kind == 13) {
+      ice = 0.5 + hueSpin * 0.25
+      ground = hsvColor(ice, 0.16 + schemeDepth * 0.1, 1.0)
+      deep = hsvColor(ice + 0.03, 0.55 + schemeDepth * 0.25, 0.72)
+      outer = hsvColor(ice, 0.04, 1.0)
+      deepHind = deep
+      hindGround = hsvColor(ice - 0.02, 0.1, 1.0)
+      sheenColor = hsvColor(ice - 0.05, 0.25, 1.0)
+      sheen = 0.8
+      rim = hsvColor(ice + 0.04, 0.55, 0.42)
+      fringeLight = #ffffff
+      sparkleColor = #ffffff
+    } else if (kind == 14) {
+      vivid = 0.55 + schemeDepth * 0.35
+      ground = hsvColor(hueSpin, vivid, 0.95)
+      deep = hsvColor(hueSpin, vivid, 0.6)
+      outer = hsvColor(hueSpin, vivid * 0.8, 1.0)
+      deepHind = deep
+      hindGround = ground
+      sheenColor = #ffffff
+      sheen = 0.3
+    }
+    if (lightVeins == 1) { veinColor = color.set.a(color.mix(outer, #ffffff, 0.6), 200) }
+
+    // ---- the motif's colours: light on a dark wing, deep on a light one ----
+    figure = rolledMotif
+    lum = (ground.r * 3 + ground.g * 6 + ground.b) / 10
+    glow = color.mix(sheenColor, #ffffff, 0.72)
+    ink = color.mix(accent, #ffffff, 0.15)
+    if (lum > 165) {
+      glow = color.hsv(color.mix(sheenColor, deep, 0.5), 0.0, 2.0, 0.7)
+      ink = color.mix(accent, rim, 0.3)
+    }
+    // Per-pixel motifs need a whole program's budget; the single program
+    // draws their cheaper relatives.
+    if (detail == 0 && figure == 3) { figure = 2 }
+    if (detail == 0 && figure == 8) { figure = 7 }
+    // The edge takes the wing's own outermost colour, never a drawn outline.
+    foreEdge = color.shade(outer, -14)
+    if (foreRim > 0.0 || rimStroke > 0.0) { foreEdge = rim }
+    hindEdge = color.shade(hindGround, -14)
+    if (hindRim > 0.0 || rimStroke > 0.0) { hindEdge = rim }
+    detailSeed = hash(seed ^ detailKey)
+    stream_pop()
+
+    // ---- painting ------------------------------------------------------------
+    // Needs the 5,000,000 fuel budget of iprop 0.7.1: the soft art is blurred
+    // on the whole half canvas before the sharp detail goes on top.
+    hindOn = which != 1
+    foreOn = which != 2
+    rings = 20
+    soft = 0.85
+    if (detail == 1) {
+      rings = 36
+      soft = 1.3
+    }
+    foreGrad = stepper(deep to outer with beta(1.8, 1.0)).pick(rings)
+    hindGrad = stepper(deepHind to color.shade(hindGround, 6) with beta(1.8, 1.0)).pick(rings)
+    if (kind > 7) {
+      // The fantasy gradients step evenly, so the colour by the body shows.
+      foreGrad = stepper(deep to outer).pick(rings)
+      hindGrad = stepper(deepHind to hindGround).pick(rings)
+    }
+
+    lift = fore * (0.05 to 0.08)
+    veinShade = color.set.a(color.mix(veinColor, deep, 0.3), 38)
+    veinSoft = color.set.a(veinColor, int(float(veinColor.a) * veinFade * 1.1))
+    // Even the broad black veins of a monarch stay fine lines.
+    softVein = min(veinWidth * 1.1, fore * 0.015)
+    veinSharp = color.set.a(veinColor, int(float(veinColor.a) * veinFade * 0.6))
+    cellGlow = color.set.a(color.mix(outer, #fff8e8, 0.35), 30)
+    foreCell = 0.52 to 0.58
+    foreCellLow = 0.42 to 0.48
+    hindCell = 0.44 to 0.50
+    hindCellLow = 0.40 to 0.46
+
+    // In the hindwing program the forewing is not painted, but its mask still
+    // trims the hindwing's sharp detail exactly where it will cover it.
+    layer foreShape(alpha=surface.source_over) { poly(foreLine, #ffffff) }
+    foreMask = mask.from(foreShape)
+    if (hindOn) {
+      layer hindShape(alpha=surface.source_over) { poly(hindLine, #ffffff) }
+      hindMask = mask.from(hindShape)
+      hindOnly = mask.subtract(hindMask, foreMask)
+      outsideFore = mask.invert(foreMask)
+    }
+
+    // Soft art: shadows, colour fields and patterns in one layer, blurred a
+    // little like a photograph, so colours meet as scales do.
+    layer art(alpha=surface.source_over) {
+      if (shadow == 1 && hindOn) {
+        groundShadow(hindLine, hr, lift)
+        groundShadow(foreLine, fr, lift)
+        if (tail > 0.0) {
+          drop = {0.0, lift}
+          curve(tailBase + drop, (tailBase + tailTip) * 0.5 + drop, tailTip + drop, tailWidth * 1.3, #00000026)
+        }
+      }
+
+      // Hindwing.
+      if (hindOn && tail > 0.0) {
+        // A broad base merging into the margin, a shaft and a spatulate tip.
+        side = {-tailDir.y, tailDir.x} * (tailWidth * 0.45)
+        neck = tailBase + tailDir * (tail * hind * 0.35)
+        poly([at(hindLine, hr, tailAt - 2.6, 0.97), at(hindLine, hr, tailAt + 2.6, 0.97), neck - side, neck + side], rim)
+        curve(tailBase, (tailBase + tailTip) * 0.5, tailTip, tailWidth, rim)
+        dot(tailTip - tailDir * (tailWidth * 0.3), tailWidth * 1.35, rim)
+        curve(tailBase + tailDir * (tailWidth * 0.8), (tailBase + tailTip) * 0.5, tailTip - tailDir * (tailWidth * 0.6),
+              tailWidth * 0.32, color.mix(rim, hindGround, 0.5))
+      }
+      if (hindOn) {
+      field(hindLine, hr, hindGrad, rim, hindRim, hindBandColor, hindBandLo, hindBandHi, hair, basalF, basalAmount,
+            glass, ground, detailSeed ^ hindFieldKey, sheen, sheenColor, 22, 62, prism)
+      clip(hindMask) {
+        wingDetail(hindLine, hr, hind, detailSeed ^ hindDetailKey, mottle, ground, tones, sheenColor)
+        if (detail == 1) { mottleField(hindLine, hr, hind, detailSeed ^ hindMottleKey, 0.4 + mottle, sheenColor, hair) }
+        // Interveinal shading: scales darken along each vein and lighten in
+        // the middle of each cell. The veins themselves stay soft.
+        hindVeins(hindLine, hr, hindCell, hindCellLow, max(2.6, softVein * 3.0), veinShade)
+        cellLight(hindLine, hr, hindGaps, hind, cellGlow)
+        if (fire.a != 0) { flames(hindLine, hr, hindGaps, hind, detailSeed ^ hindFlameKey, fire, int(detail)) }
+        hindVeins(hindLine, hr, hindCell, hindCellLow, softVein, veinSoft)
+        if (hindEyes > 0) { eyeRow(hindLine, hr, hindGaps, hindEyes, eyeSize * 0.85, rim, eyeRing, eyePupil, hindBandLo < 1.0, 0) }
+        light(hindLine, hr, hind, 40.0, sheenColor)
+        if (rimStroke > 0.0) { wideStroke(hindLine, rimStroke * 2.0, rim) }
+        if (hindDiag == 1) { band(hindLine, hr, hind, 13.0, 66.0, 0.55, diagWidth * 0.8, diagColor) }
+        if (rays == 1) { hindRays(hindLine, hr, hind, rayColor) }
+        if (spotRows > 0) { spotField(hindLine, hr, hind, hindGaps, spotRows, spotColor, detailSeed ^ hindSpotKey) }
+        if (lines > 0) { wavy(hindLine, hr, 22.0, 60.0, 0.62, hind, color.set.a(rim, 150)) }
+        if (blueRow == 1) { lunules(hindLine, hr, hindGaps, hindRim, hind, accent2) }
+        motifArt(figure, hindLine, hr, hind, hindGaps, 24, 60, detailSeed ^ hindMotifKey, glow, ink)
+        // The forewing's soft shadow on the hindwing.
+        poly(shifted(foreLine, {fore * 0.008, fore * 0.022}), #00000048)
+      }
+      }
+
+      // Forewing.
+      if (foreOn) {
+      field(foreLine, fr, foreGrad, rim, foreRim, bandColor, bandLo, bandHi, hair, basalF, basalAmount,
+            glass, ground, detailSeed ^ foreFieldKey, sheen, sheenColor, 20, 62, prism)
+      clip(foreMask) {
+        wingDetail(foreLine, fr, fore, detailSeed ^ foreDetailKey, mottle, ground, tones, sheenColor)
+        if (detail == 1) { mottleField(foreLine, fr, fore, detailSeed ^ foreMottleKey, 0.4 + mottle, sheenColor, hair) }
+        foreVeins(foreLine, fr, foreCell, foreCellLow, max(2.8, softVein * 3.0), veinShade)
+        cellLight(foreLine, fr, foreGaps, fore, cellGlow)
+        if (fire.a != 0) { flames(foreLine, fr, foreGaps, fore, detailSeed ^ foreFlameKey, fire, int(detail)) }
+        foreVeins(foreLine, fr, foreCell, foreCellLow, softVein, veinSoft)
+        if (foreEyes > 0) { eyeRow(foreLine, fr, foreGaps, foreEyes, eyeSize, rim, eyeRing, eyePupil, 0, 0) }
+        light(foreLine, fr, fore, 30.0, sheenColor)
+        if (rimStroke > 0.0) { wideStroke(foreLine, rimStroke * 2.0, rim) }
+        if (stripes > 0) { tigerStripes(foreLine, fr, fore, stripes, stripeColor, detailSeed ^ stripeKey) }
+        if (diag == 1) { band(foreLine, fr, fore, diagCosta, diagEnd, diagBow, diagWidth, diagColor) }
+        if (apexPatch > 0.0) {
+          tip = at(foreLine, fr, 24.0, 1.04)
+          dot(tip, fore * apexPatch * 2.25, color.set.a(apexColor, 70))
+          dot(tip, fore * apexPatch * 2.0, apexColor)
+        }
+        if (spotRows > 0) { spotField(foreLine, fr, fore, foreGaps, spotRows, spotColor, detailSeed ^ foreSpotKey) }
+        if (discal > 0) { discalSpots(foreLine, fr, fore, discal, spotColor) }
+        if (lines > 0) { wavy(foreLine, fr, 14.0, 60.0, 0.56, fore, color.set.a(rim, 150)) }
+        if (subapical > 0) { subapicalSpots(foreLine, fr, fore, subapical, subapicalColor) }
+        motifArt(figure, foreLine, fr, fore, foreGaps, 22, 62, detailSeed ^ foreMotifKey, glow, ink)
+      }
+      }
+    }
+    surface.paint(art.blur(soft), blend=surface.source_over)
+
+    // Sharp detail over the soft art: scales, the motif and hair, and with
+    // detail a faint hairline over each soft vein. The hindwing's share stops
+    // where the forewing covers it. A tile of per-pixel scale texture is laid
+    // across both wings first.
+    scales.draw(detailSeed ^ scaleKey, at={0, 0})
+    darkScales = scales.outputs.dark
+    scaleShade = color.set.a(color.mix(rim, #000000, 0.5), 34)
+    if (hindOn) {
+    clip(hindOnly) {
+      scaleTexture(hindLine, darkScales, scaleShade)
+      if (detail == 1) { scaleRows(hindLine, hr, hind, detailSeed ^ hindRowKey, rim, sheenColor) }
+      if (sparkle == 1) { glints(hindLine, hr, detailSeed ^ hindGlintKey, sparkleColor, stars) }
+      if (detail == 1) { hindVeins(hindLine, hr, hindCell, hindCellLow, softVein * 0.6, veinSharp) }
+      motifSharp(figure, hindLine, hr, hind, hindGaps, 24, 60, detailSeed ^ hindMotifKey, glow, ink, int(detail))
+      if (hindEyes > 0) { eyeRow(hindLine, hr, hindGaps, hindEyes, eyeSize * 0.85, rim, eyeRing, eyePupil, hindBandLo < 1.0, 1) }
+      if (analEye > 0) { analSpot(hindLine, hr, eyeSize * 0.8, analEye, accent, accent2, rim) }
+      if (marginRows > 0) { marginSpots(hindLine, hr, hindGaps, marginRows, hindRim, marginSize, marginColor) }
+      grain(hindLine, hr, hind, texture, int(detail), detailSeed ^ hindGrainKey)
+      baseHair(hr, hind, hair, detailSeed ^ hindHairKey)
+    }
+    clip(outsideFore) {
+      innerHair(hindLine, hr, hind, hair, detailSeed ^ innerHairKey)
+      edging(hindLine, hr, 24, 60, hindEdge, fringeLight, fringeDark, checker, hind)
+    }
+    }
+    if (foreOn) {
+    clip(foreMask) {
+      scaleTexture(foreLine, darkScales, scaleShade)
+      if (detail == 1) { scaleRows(foreLine, fr, fore, detailSeed ^ foreRowKey, rim, sheenColor) }
+      if (sparkle == 1) { glints(foreLine, fr, detailSeed ^ foreGlintKey, sparkleColor, stars) }
+      if (detail == 1) { foreVeins(foreLine, fr, foreCell, foreCellLow, softVein * 0.6, veinSharp) }
+      motifSharp(figure, foreLine, fr, fore, foreGaps, 22, 62, detailSeed ^ foreMotifKey, glow, ink, int(detail))
+      if (foreEyes > 0) { eyeRow(foreLine, fr, foreGaps, foreEyes, eyeSize, rim, eyeRing, eyePupil, 0, 1) }
+      if (marginRows > 0) { marginSpots(foreLine, fr, foreGaps, marginRows, foreRim, marginSize, marginColor) }
+      grain(foreLine, fr, fore, texture, int(detail), detailSeed ^ foreGrainKey)
+      baseHair(fr, fore, hair, detailSeed ^ foreHairKey)
+    }
+    edging(foreLine, fr, 22, 62, foreEdge, fringeLight, fringeDark, checker, fore)
+    antennaDraw(rootY, fore, thorax, antenna, antennaAngle, hair, antennaTip, look)
+    }
+    if (report == 1) {
+      shift = {hueF, satF}
+      level = {valF, liftF}
+      dusk = {sinkF, float(rolledMotif)}
+      design = {float(look), float(kind)}
+    }
+  }
+
+  // ---------------------------------------------------------------- geometry
+
+  hindKey(p: vec2, turn: f32, wide: f32, tall: f32, jitter: vec2) -> vec2 {
+    q = vec2.rot({p.x * wide, p.y * tall} + jitter, turn * 0.0174532925)
+    return {max(q.x, 0.05), q.y}
+  }
+
+  dir(deg: f32) -> vec2 {
+    a = deg * 0.0174532925
+    return {cos(a), -sin(a)}
+  }
+
+  placed(k: list<vec2>, at: vec2, s: f32) -> list<vec2> {
+    return [at + k[0] * s, at + k[1] * s, at + k[2] * s, at + k[3] * s,
+            at + k[4] * s, at + k[5] * s, at + k[6] * s, at + k[7] * s]
+  }
+
+  cr(p0: vec2, p1: vec2, p2: vec2, p3: vec2, t: f32) -> vec2 {
+    t2 = t * t
+    t3 = t2 * t
+    return (p1 * 2.0 + (p2 - p0) * t + (p0 * 2.0 - p1 * 5.0 + p2 * 4.0 - p3) * t2
+            + (p1 * 3.0 - p0 - p2 * 3.0 + p3) * t3) * 0.5
+  }
+
+  // Point i of 96 on the closed spline through the keys; sp holds the margin
+  // start and end (fractions of the outline), scallop depth and count.
+  op(k: list<vec2>, sp: list<f32>, i: i32) -> vec2 {
+    n = list.len(k)
+    s = float(i) * float(n) / 96.0
+    j = int(s)
+    p = cr(k[(j + n - 1) % n], k[j], k[(j + 1) % n], k[(j + 2) % n], s - float(j))
+    g = float(i) / 96.0
+    if (sp[2] > 0.0 && g > sp[0] && g < sp[1]) {
+      u = (g - sp[0]) / (sp[1] - sp[0])
+      taper = smoothstep(0.0, 0.12, u) * (1.0 - smoothstep(0.88, 1.0, u))
+      wave = sqrt(abs(sin(3.14159265 * sp[3] * u)))
+      p = p + vec2.normalize(p - k[0]) * (sp[2] * (wave - 0.75) * taper)
+    }
+    return p
+  }
+
+  outline(k: list<vec2>, sp: list<f32>) -> list<vec2> {
+    return [
+      op(k, sp, 0), op(k, sp, 1), op(k, sp, 2), op(k, sp, 3), op(k, sp, 4), op(k, sp, 5), op(k, sp, 6), op(k, sp, 7),
+      op(k, sp, 8), op(k, sp, 9), op(k, sp, 10), op(k, sp, 11), op(k, sp, 12), op(k, sp, 13), op(k, sp, 14), op(k, sp, 15),
+      op(k, sp, 16), op(k, sp, 17), op(k, sp, 18), op(k, sp, 19), op(k, sp, 20), op(k, sp, 21), op(k, sp, 22), op(k, sp, 23),
+      op(k, sp, 24), op(k, sp, 25), op(k, sp, 26), op(k, sp, 27), op(k, sp, 28), op(k, sp, 29), op(k, sp, 30), op(k, sp, 31),
+      op(k, sp, 32), op(k, sp, 33), op(k, sp, 34), op(k, sp, 35), op(k, sp, 36), op(k, sp, 37), op(k, sp, 38), op(k, sp, 39),
+      op(k, sp, 40), op(k, sp, 41), op(k, sp, 42), op(k, sp, 43), op(k, sp, 44), op(k, sp, 45), op(k, sp, 46), op(k, sp, 47),
+      op(k, sp, 48), op(k, sp, 49), op(k, sp, 50), op(k, sp, 51), op(k, sp, 52), op(k, sp, 53), op(k, sp, 54), op(k, sp, 55),
+      op(k, sp, 56), op(k, sp, 57), op(k, sp, 58), op(k, sp, 59), op(k, sp, 60), op(k, sp, 61), op(k, sp, 62), op(k, sp, 63),
+      op(k, sp, 64), op(k, sp, 65), op(k, sp, 66), op(k, sp, 67), op(k, sp, 68), op(k, sp, 69), op(k, sp, 70), op(k, sp, 71),
+      op(k, sp, 72), op(k, sp, 73), op(k, sp, 74), op(k, sp, 75), op(k, sp, 76), op(k, sp, 77), op(k, sp, 78), op(k, sp, 79),
+      op(k, sp, 80), op(k, sp, 81), op(k, sp, 82), op(k, sp, 83), op(k, sp, 84), op(k, sp, 85), op(k, sp, 86), op(k, sp, 87),
+      op(k, sp, 88), op(k, sp, 89), op(k, sp, 90), op(k, sp, 91), op(k, sp, 92), op(k, sp, 93), op(k, sp, 94), op(k, sp, 95)
+    ]
+  }
+
+  // The outline scaled by f about c.
+  sc(p: list<vec2>, c: vec2, f: f32) -> list<vec2> {
+    return [
+      c + (p[0] - c) * f, c + (p[1] - c) * f, c + (p[2] - c) * f, c + (p[3] - c) * f, c + (p[4] - c) * f, c + (p[5] - c) * f,
+      c + (p[6] - c) * f, c + (p[7] - c) * f, c + (p[8] - c) * f, c + (p[9] - c) * f, c + (p[10] - c) * f, c + (p[11] - c) * f,
+      c + (p[12] - c) * f, c + (p[13] - c) * f, c + (p[14] - c) * f, c + (p[15] - c) * f, c + (p[16] - c) * f, c + (p[17] - c) * f,
+      c + (p[18] - c) * f, c + (p[19] - c) * f, c + (p[20] - c) * f, c + (p[21] - c) * f, c + (p[22] - c) * f, c + (p[23] - c) * f,
+      c + (p[24] - c) * f, c + (p[25] - c) * f, c + (p[26] - c) * f, c + (p[27] - c) * f, c + (p[28] - c) * f, c + (p[29] - c) * f,
+      c + (p[30] - c) * f, c + (p[31] - c) * f, c + (p[32] - c) * f, c + (p[33] - c) * f, c + (p[34] - c) * f, c + (p[35] - c) * f,
+      c + (p[36] - c) * f, c + (p[37] - c) * f, c + (p[38] - c) * f, c + (p[39] - c) * f, c + (p[40] - c) * f, c + (p[41] - c) * f,
+      c + (p[42] - c) * f, c + (p[43] - c) * f, c + (p[44] - c) * f, c + (p[45] - c) * f, c + (p[46] - c) * f, c + (p[47] - c) * f,
+      c + (p[48] - c) * f, c + (p[49] - c) * f, c + (p[50] - c) * f, c + (p[51] - c) * f, c + (p[52] - c) * f, c + (p[53] - c) * f,
+      c + (p[54] - c) * f, c + (p[55] - c) * f, c + (p[56] - c) * f, c + (p[57] - c) * f, c + (p[58] - c) * f, c + (p[59] - c) * f,
+      c + (p[60] - c) * f, c + (p[61] - c) * f, c + (p[62] - c) * f, c + (p[63] - c) * f, c + (p[64] - c) * f, c + (p[65] - c) * f,
+      c + (p[66] - c) * f, c + (p[67] - c) * f, c + (p[68] - c) * f, c + (p[69] - c) * f, c + (p[70] - c) * f, c + (p[71] - c) * f,
+      c + (p[72] - c) * f, c + (p[73] - c) * f, c + (p[74] - c) * f, c + (p[75] - c) * f, c + (p[76] - c) * f, c + (p[77] - c) * f,
+      c + (p[78] - c) * f, c + (p[79] - c) * f, c + (p[80] - c) * f, c + (p[81] - c) * f, c + (p[82] - c) * f, c + (p[83] - c) * f,
+      c + (p[84] - c) * f, c + (p[85] - c) * f, c + (p[86] - c) * f, c + (p[87] - c) * f, c + (p[88] - c) * f, c + (p[89] - c) * f,
+      c + (p[90] - c) * f, c + (p[91] - c) * f, c + (p[92] - c) * f, c + (p[93] - c) * f, c + (p[94] - c) * f, c + (p[95] - c) * f
+    ]
+  }
+
+  shifted(p: list<vec2>, d: vec2) -> list<vec2> {
+    return [
+      p[0] + d, p[1] + d, p[2] + d, p[3] + d, p[4] + d, p[5] + d, p[6] + d, p[7] + d,
+      p[8] + d, p[9] + d, p[10] + d, p[11] + d, p[12] + d, p[13] + d, p[14] + d, p[15] + d,
+      p[16] + d, p[17] + d, p[18] + d, p[19] + d, p[20] + d, p[21] + d, p[22] + d, p[23] + d,
+      p[24] + d, p[25] + d, p[26] + d, p[27] + d, p[28] + d, p[29] + d, p[30] + d, p[31] + d,
+      p[32] + d, p[33] + d, p[34] + d, p[35] + d, p[36] + d, p[37] + d, p[38] + d, p[39] + d,
+      p[40] + d, p[41] + d, p[42] + d, p[43] + d, p[44] + d, p[45] + d, p[46] + d, p[47] + d,
+      p[48] + d, p[49] + d, p[50] + d, p[51] + d, p[52] + d, p[53] + d, p[54] + d, p[55] + d,
+      p[56] + d, p[57] + d, p[58] + d, p[59] + d, p[60] + d, p[61] + d, p[62] + d, p[63] + d,
+      p[64] + d, p[65] + d, p[66] + d, p[67] + d, p[68] + d, p[69] + d, p[70] + d, p[71] + d,
+      p[72] + d, p[73] + d, p[74] + d, p[75] + d, p[76] + d, p[77] + d, p[78] + d, p[79] + d,
+      p[80] + d, p[81] + d, p[82] + d, p[83] + d, p[84] + d, p[85] + d, p[86] + d, p[87] + d,
+      p[88] + d, p[89] + d, p[90] + d, p[91] + d, p[92] + d, p[93] + d, p[94] + d, p[95] + d
+    ]
+  }
+
+  // The outline scaled by its own factor at every point.
+  scj(p: list<vec2>, c: vec2, f: list<f32>) -> list<vec2> {
+    return [
+      c + (p[0] - c) * f[0], c + (p[1] - c) * f[1], c + (p[2] - c) * f[2], c + (p[3] - c) * f[3], c + (p[4] - c) * f[4], c + (p[5] - c) * f[5],
+      c + (p[6] - c) * f[6], c + (p[7] - c) * f[7], c + (p[8] - c) * f[8], c + (p[9] - c) * f[9], c + (p[10] - c) * f[10], c + (p[11] - c) * f[11],
+      c + (p[12] - c) * f[12], c + (p[13] - c) * f[13], c + (p[14] - c) * f[14], c + (p[15] - c) * f[15], c + (p[16] - c) * f[16], c + (p[17] - c) * f[17],
+      c + (p[18] - c) * f[18], c + (p[19] - c) * f[19], c + (p[20] - c) * f[20], c + (p[21] - c) * f[21], c + (p[22] - c) * f[22], c + (p[23] - c) * f[23],
+      c + (p[24] - c) * f[24], c + (p[25] - c) * f[25], c + (p[26] - c) * f[26], c + (p[27] - c) * f[27], c + (p[28] - c) * f[28], c + (p[29] - c) * f[29],
+      c + (p[30] - c) * f[30], c + (p[31] - c) * f[31], c + (p[32] - c) * f[32], c + (p[33] - c) * f[33], c + (p[34] - c) * f[34], c + (p[35] - c) * f[35],
+      c + (p[36] - c) * f[36], c + (p[37] - c) * f[37], c + (p[38] - c) * f[38], c + (p[39] - c) * f[39], c + (p[40] - c) * f[40], c + (p[41] - c) * f[41],
+      c + (p[42] - c) * f[42], c + (p[43] - c) * f[43], c + (p[44] - c) * f[44], c + (p[45] - c) * f[45], c + (p[46] - c) * f[46], c + (p[47] - c) * f[47],
+      c + (p[48] - c) * f[48], c + (p[49] - c) * f[49], c + (p[50] - c) * f[50], c + (p[51] - c) * f[51], c + (p[52] - c) * f[52], c + (p[53] - c) * f[53],
+      c + (p[54] - c) * f[54], c + (p[55] - c) * f[55], c + (p[56] - c) * f[56], c + (p[57] - c) * f[57], c + (p[58] - c) * f[58], c + (p[59] - c) * f[59],
+      c + (p[60] - c) * f[60], c + (p[61] - c) * f[61], c + (p[62] - c) * f[62], c + (p[63] - c) * f[63], c + (p[64] - c) * f[64], c + (p[65] - c) * f[65],
+      c + (p[66] - c) * f[66], c + (p[67] - c) * f[67], c + (p[68] - c) * f[68], c + (p[69] - c) * f[69], c + (p[70] - c) * f[70], c + (p[71] - c) * f[71],
+      c + (p[72] - c) * f[72], c + (p[73] - c) * f[73], c + (p[74] - c) * f[74], c + (p[75] - c) * f[75], c + (p[76] - c) * f[76], c + (p[77] - c) * f[77],
+      c + (p[78] - c) * f[78], c + (p[79] - c) * f[79], c + (p[80] - c) * f[80], c + (p[81] - c) * f[81], c + (p[82] - c) * f[82], c + (p[83] - c) * f[83],
+      c + (p[84] - c) * f[84], c + (p[85] - c) * f[85], c + (p[86] - c) * f[86], c + (p[87] - c) * f[87], c + (p[88] - c) * f[88], c + (p[89] - c) * f[89],
+      c + (p[90] - c) * f[90], c + (p[91] - c) * f[91], c + (p[92] - c) * f[92], c + (p[93] - c) * f[93], c + (p[94] - c) * f[94], c + (p[95] - c) * f[95]
+    ]
+  }
+
+  // Three smooth wobble patterns per wing, one noise value per outline
+  // point; every ring scales the outline by f along one of them, so colour
+  // boundaries run in organic waves rather than exact copies of the margin.
+  waves(z: f32) -> list<f32> {
+    return [
+      noise.grad(float(0) * 0.19, z, 0x2d), noise.grad(float(1) * 0.19, z, 0x2d), noise.grad(float(2) * 0.19, z, 0x2d), noise.grad(float(3) * 0.19, z, 0x2d),
+      noise.grad(float(4) * 0.19, z, 0x2d), noise.grad(float(5) * 0.19, z, 0x2d), noise.grad(float(6) * 0.19, z, 0x2d), noise.grad(float(7) * 0.19, z, 0x2d),
+      noise.grad(float(8) * 0.19, z, 0x2d), noise.grad(float(9) * 0.19, z, 0x2d), noise.grad(float(10) * 0.19, z, 0x2d), noise.grad(float(11) * 0.19, z, 0x2d),
+      noise.grad(float(12) * 0.19, z, 0x2d), noise.grad(float(13) * 0.19, z, 0x2d), noise.grad(float(14) * 0.19, z, 0x2d), noise.grad(float(15) * 0.19, z, 0x2d),
+      noise.grad(float(16) * 0.19, z, 0x2d), noise.grad(float(17) * 0.19, z, 0x2d), noise.grad(float(18) * 0.19, z, 0x2d), noise.grad(float(19) * 0.19, z, 0x2d),
+      noise.grad(float(20) * 0.19, z, 0x2d), noise.grad(float(21) * 0.19, z, 0x2d), noise.grad(float(22) * 0.19, z, 0x2d), noise.grad(float(23) * 0.19, z, 0x2d),
+      noise.grad(float(24) * 0.19, z, 0x2d), noise.grad(float(25) * 0.19, z, 0x2d), noise.grad(float(26) * 0.19, z, 0x2d), noise.grad(float(27) * 0.19, z, 0x2d),
+      noise.grad(float(28) * 0.19, z, 0x2d), noise.grad(float(29) * 0.19, z, 0x2d), noise.grad(float(30) * 0.19, z, 0x2d), noise.grad(float(31) * 0.19, z, 0x2d),
+      noise.grad(float(32) * 0.19, z, 0x2d), noise.grad(float(33) * 0.19, z, 0x2d), noise.grad(float(34) * 0.19, z, 0x2d), noise.grad(float(35) * 0.19, z, 0x2d),
+      noise.grad(float(36) * 0.19, z, 0x2d), noise.grad(float(37) * 0.19, z, 0x2d), noise.grad(float(38) * 0.19, z, 0x2d), noise.grad(float(39) * 0.19, z, 0x2d),
+      noise.grad(float(40) * 0.19, z, 0x2d), noise.grad(float(41) * 0.19, z, 0x2d), noise.grad(float(42) * 0.19, z, 0x2d), noise.grad(float(43) * 0.19, z, 0x2d),
+      noise.grad(float(44) * 0.19, z, 0x2d), noise.grad(float(45) * 0.19, z, 0x2d), noise.grad(float(46) * 0.19, z, 0x2d), noise.grad(float(47) * 0.19, z, 0x2d),
+      noise.grad(float(48) * 0.19, z, 0x2d), noise.grad(float(49) * 0.19, z, 0x2d), noise.grad(float(50) * 0.19, z, 0x2d), noise.grad(float(51) * 0.19, z, 0x2d),
+      noise.grad(float(52) * 0.19, z, 0x2d), noise.grad(float(53) * 0.19, z, 0x2d), noise.grad(float(54) * 0.19, z, 0x2d), noise.grad(float(55) * 0.19, z, 0x2d),
+      noise.grad(float(56) * 0.19, z, 0x2d), noise.grad(float(57) * 0.19, z, 0x2d), noise.grad(float(58) * 0.19, z, 0x2d), noise.grad(float(59) * 0.19, z, 0x2d),
+      noise.grad(float(60) * 0.19, z, 0x2d), noise.grad(float(61) * 0.19, z, 0x2d), noise.grad(float(62) * 0.19, z, 0x2d), noise.grad(float(63) * 0.19, z, 0x2d),
+      noise.grad(float(64) * 0.19, z, 0x2d), noise.grad(float(65) * 0.19, z, 0x2d), noise.grad(float(66) * 0.19, z, 0x2d), noise.grad(float(67) * 0.19, z, 0x2d),
+      noise.grad(float(68) * 0.19, z, 0x2d), noise.grad(float(69) * 0.19, z, 0x2d), noise.grad(float(70) * 0.19, z, 0x2d), noise.grad(float(71) * 0.19, z, 0x2d),
+      noise.grad(float(72) * 0.19, z, 0x2d), noise.grad(float(73) * 0.19, z, 0x2d), noise.grad(float(74) * 0.19, z, 0x2d), noise.grad(float(75) * 0.19, z, 0x2d),
+      noise.grad(float(76) * 0.19, z, 0x2d), noise.grad(float(77) * 0.19, z, 0x2d), noise.grad(float(78) * 0.19, z, 0x2d), noise.grad(float(79) * 0.19, z, 0x2d),
+      noise.grad(float(80) * 0.19, z, 0x2d), noise.grad(float(81) * 0.19, z, 0x2d), noise.grad(float(82) * 0.19, z, 0x2d), noise.grad(float(83) * 0.19, z, 0x2d),
+      noise.grad(float(84) * 0.19, z, 0x2d), noise.grad(float(85) * 0.19, z, 0x2d), noise.grad(float(86) * 0.19, z, 0x2d), noise.grad(float(87) * 0.19, z, 0x2d),
+      noise.grad(float(88) * 0.19, z, 0x2d), noise.grad(float(89) * 0.19, z, 0x2d), noise.grad(float(90) * 0.19, z, 0x2d), noise.grad(float(91) * 0.19, z, 0x2d),
+      noise.grad(float(92) * 0.19, z, 0x2d), noise.grad(float(93) * 0.19, z, 0x2d), noise.grad(float(94) * 0.19, z, 0x2d), noise.grad(float(95) * 0.19, z, 0x2d)
+    ]
+  }
+
+  // The outline scaled about c by f, wobbled by amp along the pattern w.
+  scw(p: list<vec2>, c: vec2, f: f32, amp: f32, w: list<f32>) -> list<vec2> {
+    return [
+      c + (p[0] - c) * min(f * (1.0 + amp * w[0]), 0.996), c + (p[1] - c) * min(f * (1.0 + amp * w[1]), 0.996), c + (p[2] - c) * min(f * (1.0 + amp * w[2]), 0.996),
+      c + (p[3] - c) * min(f * (1.0 + amp * w[3]), 0.996), c + (p[4] - c) * min(f * (1.0 + amp * w[4]), 0.996), c + (p[5] - c) * min(f * (1.0 + amp * w[5]), 0.996),
+      c + (p[6] - c) * min(f * (1.0 + amp * w[6]), 0.996), c + (p[7] - c) * min(f * (1.0 + amp * w[7]), 0.996), c + (p[8] - c) * min(f * (1.0 + amp * w[8]), 0.996),
+      c + (p[9] - c) * min(f * (1.0 + amp * w[9]), 0.996), c + (p[10] - c) * min(f * (1.0 + amp * w[10]), 0.996), c + (p[11] - c) * min(f * (1.0 + amp * w[11]), 0.996),
+      c + (p[12] - c) * min(f * (1.0 + amp * w[12]), 0.996), c + (p[13] - c) * min(f * (1.0 + amp * w[13]), 0.996), c + (p[14] - c) * min(f * (1.0 + amp * w[14]), 0.996),
+      c + (p[15] - c) * min(f * (1.0 + amp * w[15]), 0.996), c + (p[16] - c) * min(f * (1.0 + amp * w[16]), 0.996), c + (p[17] - c) * min(f * (1.0 + amp * w[17]), 0.996),
+      c + (p[18] - c) * min(f * (1.0 + amp * w[18]), 0.996), c + (p[19] - c) * min(f * (1.0 + amp * w[19]), 0.996), c + (p[20] - c) * min(f * (1.0 + amp * w[20]), 0.996),
+      c + (p[21] - c) * min(f * (1.0 + amp * w[21]), 0.996), c + (p[22] - c) * min(f * (1.0 + amp * w[22]), 0.996), c + (p[23] - c) * min(f * (1.0 + amp * w[23]), 0.996),
+      c + (p[24] - c) * min(f * (1.0 + amp * w[24]), 0.996), c + (p[25] - c) * min(f * (1.0 + amp * w[25]), 0.996), c + (p[26] - c) * min(f * (1.0 + amp * w[26]), 0.996),
+      c + (p[27] - c) * min(f * (1.0 + amp * w[27]), 0.996), c + (p[28] - c) * min(f * (1.0 + amp * w[28]), 0.996), c + (p[29] - c) * min(f * (1.0 + amp * w[29]), 0.996),
+      c + (p[30] - c) * min(f * (1.0 + amp * w[30]), 0.996), c + (p[31] - c) * min(f * (1.0 + amp * w[31]), 0.996), c + (p[32] - c) * min(f * (1.0 + amp * w[32]), 0.996),
+      c + (p[33] - c) * min(f * (1.0 + amp * w[33]), 0.996), c + (p[34] - c) * min(f * (1.0 + amp * w[34]), 0.996), c + (p[35] - c) * min(f * (1.0 + amp * w[35]), 0.996),
+      c + (p[36] - c) * min(f * (1.0 + amp * w[36]), 0.996), c + (p[37] - c) * min(f * (1.0 + amp * w[37]), 0.996), c + (p[38] - c) * min(f * (1.0 + amp * w[38]), 0.996),
+      c + (p[39] - c) * min(f * (1.0 + amp * w[39]), 0.996), c + (p[40] - c) * min(f * (1.0 + amp * w[40]), 0.996), c + (p[41] - c) * min(f * (1.0 + amp * w[41]), 0.996),
+      c + (p[42] - c) * min(f * (1.0 + amp * w[42]), 0.996), c + (p[43] - c) * min(f * (1.0 + amp * w[43]), 0.996), c + (p[44] - c) * min(f * (1.0 + amp * w[44]), 0.996),
+      c + (p[45] - c) * min(f * (1.0 + amp * w[45]), 0.996), c + (p[46] - c) * min(f * (1.0 + amp * w[46]), 0.996), c + (p[47] - c) * min(f * (1.0 + amp * w[47]), 0.996),
+      c + (p[48] - c) * min(f * (1.0 + amp * w[48]), 0.996), c + (p[49] - c) * min(f * (1.0 + amp * w[49]), 0.996), c + (p[50] - c) * min(f * (1.0 + amp * w[50]), 0.996),
+      c + (p[51] - c) * min(f * (1.0 + amp * w[51]), 0.996), c + (p[52] - c) * min(f * (1.0 + amp * w[52]), 0.996), c + (p[53] - c) * min(f * (1.0 + amp * w[53]), 0.996),
+      c + (p[54] - c) * min(f * (1.0 + amp * w[54]), 0.996), c + (p[55] - c) * min(f * (1.0 + amp * w[55]), 0.996), c + (p[56] - c) * min(f * (1.0 + amp * w[56]), 0.996),
+      c + (p[57] - c) * min(f * (1.0 + amp * w[57]), 0.996), c + (p[58] - c) * min(f * (1.0 + amp * w[58]), 0.996), c + (p[59] - c) * min(f * (1.0 + amp * w[59]), 0.996),
+      c + (p[60] - c) * min(f * (1.0 + amp * w[60]), 0.996), c + (p[61] - c) * min(f * (1.0 + amp * w[61]), 0.996), c + (p[62] - c) * min(f * (1.0 + amp * w[62]), 0.996),
+      c + (p[63] - c) * min(f * (1.0 + amp * w[63]), 0.996), c + (p[64] - c) * min(f * (1.0 + amp * w[64]), 0.996), c + (p[65] - c) * min(f * (1.0 + amp * w[65]), 0.996),
+      c + (p[66] - c) * min(f * (1.0 + amp * w[66]), 0.996), c + (p[67] - c) * min(f * (1.0 + amp * w[67]), 0.996), c + (p[68] - c) * min(f * (1.0 + amp * w[68]), 0.996),
+      c + (p[69] - c) * min(f * (1.0 + amp * w[69]), 0.996), c + (p[70] - c) * min(f * (1.0 + amp * w[70]), 0.996), c + (p[71] - c) * min(f * (1.0 + amp * w[71]), 0.996),
+      c + (p[72] - c) * min(f * (1.0 + amp * w[72]), 0.996), c + (p[73] - c) * min(f * (1.0 + amp * w[73]), 0.996), c + (p[74] - c) * min(f * (1.0 + amp * w[74]), 0.996),
+      c + (p[75] - c) * min(f * (1.0 + amp * w[75]), 0.996), c + (p[76] - c) * min(f * (1.0 + amp * w[76]), 0.996), c + (p[77] - c) * min(f * (1.0 + amp * w[77]), 0.996),
+      c + (p[78] - c) * min(f * (1.0 + amp * w[78]), 0.996), c + (p[79] - c) * min(f * (1.0 + amp * w[79]), 0.996), c + (p[80] - c) * min(f * (1.0 + amp * w[80]), 0.996),
+      c + (p[81] - c) * min(f * (1.0 + amp * w[81]), 0.996), c + (p[82] - c) * min(f * (1.0 + amp * w[82]), 0.996), c + (p[83] - c) * min(f * (1.0 + amp * w[83]), 0.996),
+      c + (p[84] - c) * min(f * (1.0 + amp * w[84]), 0.996), c + (p[85] - c) * min(f * (1.0 + amp * w[85]), 0.996), c + (p[86] - c) * min(f * (1.0 + amp * w[86]), 0.996),
+      c + (p[87] - c) * min(f * (1.0 + amp * w[87]), 0.996), c + (p[88] - c) * min(f * (1.0 + amp * w[88]), 0.996), c + (p[89] - c) * min(f * (1.0 + amp * w[89]), 0.996),
+      c + (p[90] - c) * min(f * (1.0 + amp * w[90]), 0.996), c + (p[91] - c) * min(f * (1.0 + amp * w[91]), 0.996), c + (p[92] - c) * min(f * (1.0 + amp * w[92]), 0.996),
+      c + (p[93] - c) * min(f * (1.0 + amp * w[93]), 0.996), c + (p[94] - c) * min(f * (1.0 + amp * w[94]), 0.996), c + (p[95] - c) * min(f * (1.0 + amp * w[95]), 0.996)
+    ]
+  }
+
+  // A point at outline position u (fractional index), a fraction f of the way
+  // from the root r to the margin.
+  at(p: list<vec2>, r: vec2, u: f32, f: f32) -> vec2 {
+    i = int(floor(u))
+    t = u - float(i)
+    q = p[(i + 96) % 96] * (1.0 - t) + p[(i + 97) % 96] * t
+    return r + (q - r) * f
+  }
+
+  // ---------------------------------------------------------------- painting
+
+  dot(p: vec2, d: f32, c: color) { curve(p, p, p, d, c) }
+
+  dash(a: vec2, b: vec2, d: f32, c: color) { curve(a, (a + b) * 0.5, b, d, c) }
+
+  stroke(p: list<vec2>, width: f32, c: color) {
+    for i in 0..96 { dash(p[i], p[(i + 1) % 96], width, c) }
+  }
+
+  // A wide stroke through every other point: quadratic curves through the
+  // midpoints, half as many and just as smooth.
+  wideStroke(p: list<vec2>, width: f32, c: color) {
+    for i in 0..48 {
+      a = (p[i * 2] + p[(i * 2 + 1) % 96]) * 0.5
+      b = (p[(i * 2 + 2) % 96] + p[(i * 2 + 1) % 96]) * 0.5
+      curve(a, p[(i * 2 + 1) % 96], b, width, c)
+    }
+  }
+
+  groundShadow(p: list<vec2>, r: vec2, lift: f32) {
+    poly(sc(shifted(p, {0.0, lift * 1.4}), r + {0.0, lift}, 1.09), #0000000c)
+    poly(sc(shifted(p, {0.0, lift * 1.2}), r + {0.0, lift}, 1.05), #00000014)
+    poly(sc(shifted(p, {0.0, lift}), r + {0.0, lift}, 1.01), #0000001c)
+  }
+
+  // The colour field: outlines scaled about the root from the margin inwards,
+  // so the rim, the bands and the basal gradient all follow the wing shape.
+  field(p: list<vec2>, r: vec2, grad: list<color>, rim: color, rimW: f32, band: color,
+        lo: f32, hi: f32, hair: color, basalF: f32, basalAmount: f32, glass: i32, ground: color, key: i32,
+        sheen: f32, sheenColor: color, m0: i32, m1: i32, prism: f32) {
+    if (glass == 1) {
+      poly(p, color.set.a(ground, 70))
+      poly(sc(p, r, basalF), color.set.a(color.mix(ground, hair, 0.5), 150))
+      return;
+    }
+    stream_push(key)
+    top = 1.0
+    if (rimW > 0.0) {
+      poly(p, rim)
+      top = 1.0 - rimW
+    }
+    n = list.len(grad)
+    fs = stepper(0.06 to top with beta(1.0, 1.5, 0.06, top)).pick(n)
+    zk = float(key & 255)
+    wave0 = waves(zk)
+    wave1 = waves(zk + 3.7)
+    wave2 = waves(zk + 7.3)
+    // A band gets rings of its own at both edges, so its width never
+    // depends on where the stepped rings fall.
+    hiDone = 0
+    loDone = 0
+    for i in 0..n {
+      k = n - 1 - i
+      f = fs[k]
+      c = grad[k]
+      // Prism: every ring a little further round the colour wheel.
+      if (prism != 0.0) { c = color.hsv(c, prism * f, 1.0, 1.0) }
+      if (hiDone == 0 && hi < 1.0 && f < hi) {
+        hiDone = 1
+        poly(scj(p, r, sampler(hi * 0.99 to min(hi * 1.01, 0.996)).pick(96)), color.mix(c, band, 0.92))
+      }
+      if (loDone == 0 && hi < 1.0 && f < lo) {
+        loDone = 1
+        poly(scj(p, r, sampler(lo * 0.99 to lo * 1.01).pick(96)), color.mix(c, band, 0.12))
+      }
+      // Iridescence: a broad band of lighter scales across the middle.
+      if (sheen > 0.0) { c = color.mix(c, sheenColor, sheen * 0.5 * exp(-(f - 0.6) * (f - 0.6) * 18.0)) }
+      if (f > lo && f < hi) {
+        edge = min(f - lo, hi - f) / max(hi - lo, 0.01)
+        c = color.mix(c, band, smoothstep(0.0, 0.18, edge) * 0.92 + 0.08)
+      }
+      if (k == n - 1 && rimW > 0.0) { c = color.mix(c, rim, 0.5) }
+      if (f < basalF) { c = color.mix(c, hair, basalAmount * pow(1.0 - f / basalF, 0.8) * 0.85) }
+      if (k == n - 1 && rimW <= 0.0) { poly(p, c) }
+      else {
+        wave = wave0
+        if (k % 3 == 1) { wave = wave1 }
+        else if (k % 3 == 2) { wave = wave2 }
+        poly(scw(p, r, f, 0.012 + 0.03 * min(f / top, 1.0 - f / top) * 2.0, wave), c)
+      }
+    }
+    // Scales blend across colour boundaries: soft strokes along the rim's
+    // inner edge and both edges of a band, over the margin only.
+    if (rimW > 0.0) {
+      softEdge(sc(p, r, top), m0, m1, max(2.0, rimW * 40.0), color.set.a(rim, 70))
+      softEdge(sc(p, r, top - 0.012), m0, m1, 1.6, color.set.a(rim, 60))
+    }
+    if (hi < 1.0) {
+      softEdge(sc(p, r, hi), m0, m1, 2.6, color.set.a(band, 90))
+      softEdge(sc(p, r, lo), m0, m1, 2.6, color.set.a(band, 70))
+    }
+    stream_pop()
+  }
+
+  softEdge(p: list<vec2>, m0: i32, m1: i32, width: f32, c: color) {
+    for i in m0 / 2..m1 / 2 {
+      a = (p[i * 2] + p[i * 2 + 1]) * 0.5
+      b = (p[i * 2 + 2] + p[i * 2 + 1]) * 0.5
+      curve(a, p[i * 2 + 1], b, width, c)
+    }
+  }
+
+  // Mottling at three scales, light and dark: broad clouds, patches and
+  // specks. Under the art blur they read as soft multi-octave noise.
+  // tones 1 makes them every pastel colour (opal), 2 lights the clouds.
+  wingDetail(p: list<vec2>, r: vec2, len: f32, key: i32, mottle: f32, ground: color, tones: i32, cloud: color) {
+    stream_push(key)
+    if (mottle > 0.0) {
+      sizes = [0.12, 0.055, 0.022]
+      counts = [10, 36, 90]
+      for s in 0..3 {
+        n = counts[s]
+        us = sampler(20.0 to 64.0).pick(n)
+        fs = sampler(0.12 to 0.98 with beta(2.0, 1.2)).pick(n)
+        for i in 0..n {
+          tone = wingShades[index(3)]
+          bright = 0
+          if (tone.r == 255) {
+            tone = color.mix(ground, #ffffff, 0.5)
+            bright = 1
+          }
+          alpha = int(mottle * (10.0 to 30.0) * (1.0 + float(s) * 0.4))
+          if (tones == 1) {
+            tone = hsvColor(0.0 to 1.0, 0.55, 1.0)
+            alpha = alpha * 5 / 2
+          } else if (tones == 2 && bright == 1) {
+            tone = cloud
+            alpha = alpha * 3
+          }
+          dot(at(p, r, us[i], fs[i]), len * sizes[s] * (0.6 to 1.3), color.set.a(tone, alpha))
+        }
+      }
+    }
+    stream_pop()
+  }
+
+  // Scale texture: hundreds of single-pixel flecks, light and dark.
+  grain(p: list<vec2>, r: vec2, len: f32, amount: f32, detail: i32, key: i32) {
+    stream_push(key)
+    batches = 1
+    streaks = 180
+    if (detail == 1) {
+      batches = 3
+      streaks = 300
+    }
+    for b in 0..batches { flecks(p, r, min(int(len * 2.6 * amount), 256)) }
+    // Rows of scales: faint streaks running out from the base.
+    for i in 0..streaks {
+      u = 22.0 to 64.0
+      f = 0.08 to 0.88
+      a = at(p, r, u, f)
+      e = at(p, r, u + (-0.4 to 0.4), f + (0.04 to 0.14))
+      line(a.x, a.y, e.x, e.y, 1, pick(#0000000e, #ffffff0b))
+    }
+    stream_pop()
+  }
+
+  // The outline's bounding box in whole pixels, clipped to the canvas:
+  // {x0, y0} and {x1, y1} as two points of one list.
+  box(p: list<vec2>) -> list<vec2> {
+    x0 = p[0].x
+    y0 = p[0].y
+    x1 = x0
+    y1 = y0
+    for i in 1..96 {
+      x0 = min(x0, p[i].x)
+      y0 = min(y0, p[i].y)
+      x1 = max(x1, p[i].x)
+      y1 = max(y1, p[i].y)
+    }
+    return [{max(floor(x0), 0.0), max(floor(y0), 0.0)}, {min(ceil(x1) + 1.0, 128.0), min(ceil(y1) + 1.0, 256.0)}]
+  }
+
+  // Per-pixel mottling from three octaves of gradient noise, with light
+  // falling from above: lighter scales towards the top of the wing, darker
+  // towards the bottom. Drawn under the blur, so it reads as soft cloud.
+  mottleField(p: list<vec2>, r: vec2, len: f32, key: i32, amount: f32, glow: color, shade: color) {
+    b = box(p)
+    scale = 3.2 / len
+    tall = max(b[1].y - b[0].y, 1.0)
+    for y in int(b[0].y)..int(b[1].y) {
+      fy = float(y) * scale
+      above = (b[1].y - float(y)) / tall - 0.5
+      for x in int(b[0].x)..int(b[1].x) {
+        n = noise.fbm(float(x) * scale, fy, 3, key) * amount + above * 0.35
+        if (n > 0.0) { pixel(x, y, color.set.a(glow, int(min(n, 1.0) * 70.0))) }
+        else { pixel(x, y, color.set.a(shade, int(min(-n, 1.0) * 80.0))) }
+      }
+    }
+  }
+
+  // Rows of scales: noise stretched along the rays from the wing root, fine
+  // across them and long along them, painted sharp over the blurred art.
+  scaleRows(p: list<vec2>, r: vec2, len: f32, key: i32, dark: color, glow: color) {
+    b = box(p)
+    for y in int(b[0].y)..int(b[1].y) {
+      dy = float(y) + 0.5 - r.y
+      for x in int(b[0].x)..int(b[1].x) {
+        dx = float(x) + 0.5 - r.x
+        n = noise.grad(atan2(dy, dx) * len * 0.9, sqrt(dx * dx + dy * dy) * 0.22, key)
+        if (n > 0.18) { pixel(x, y, color.set.a(glow, int((n - 0.18) * 60.0))) }
+        else if (n < -0.18) { pixel(x, y, color.set.a(dark, int((-n - 0.18) * 70.0))) }
+      }
+    }
+  }
+
+  // The scale tile laid edge to edge over a wing's bounding box; offset
+  // views share the tile's buffer, so only the painting costs anything.
+  scaleTexture(p: list<vec2>, dark: mask, shade: color) {
+    x0 = p[0].x
+    y0 = p[0].y
+    x1 = x0
+    y1 = y0
+    for i in 1..96 {
+      x0 = min(x0, p[i].x)
+      y0 = min(y0, p[i].y)
+      x1 = max(x1, p[i].x)
+      y1 = max(y1, p[i].y)
+    }
+    for ty in int(floor(y0 / 40.0))..int(floor(y1 / 40.0)) + 1 {
+      for tx in int(floor(x0 / 40.0))..int(floor(x1 / 40.0)) + 1 {
+        surface.paint(mask.offset(dark, tx * 40, ty * 40), color=shade)
+      }
+    }
+  }
+
+  // A colour turned, rescaled in saturation and value, then lifted towards
+  // white or sunk towards black. Alpha is kept.
+  recolor(c: color, hue: f32, sat: f32, val: f32, lift: f32, sink: f32) -> color {
+    d = color.hsv(c, hue, sat, val)
+    d = color.mix(d, #ffffff, lift)
+    d = color.mix(d, #000000, sink)
+    return color.set.a(d, c.a)
+  }
+
+  // A colour from its hue in turns, saturation and value (all 0..1).
+  hsvColor(h: f32, s: f32, v: f32) -> color {
+    return color.hsv(#ff0000, h, s, v)
+  }
+
+  // The hue of a colour in turns; 0 for greys.
+  hueOf(c: color) -> f32 {
+    r = float(c.r)
+    g = float(c.g)
+    b = float(c.b)
+    hi = max(r, max(g, b))
+    d = hi - min(r, min(g, b))
+    if (d <= 0.0) { return 0.0 }
+    h = 4.0 + (r - g) / d
+    if (hi == r) { h = (g - b) / d }
+    else if (hi == g) { h = 2.0 + (b - r) / d }
+    h = h / 6.0
+    if (h < 0.0) { h = h + 1.0 }
+    return h
+  }
+
+  // Iridescent glints: bright single scales catching the light (magic),
+  // or the stars of a nebula.
+  glints(p: list<vec2>, r: vec2, key: i32, c: color, n: i32) {
+    stream_push(key)
+    us = sampler(20.0 to 64.0).pick(n)
+    fs = sampler(0.15 to 0.97 with beta(2.0, 1.3)).pick(n)
+    for i in 0..n {
+      q = at(p, r, us[i], fs[i])
+      pixel(int(q.x), int(q.y), color.set.a(c, 120 to 230))
+      if (chance(0.25)) { dot(q, 1.6, color.set.a(c, 70)) }
+    }
+    stream_pop()
+  }
+
+  // Single-pixel scale flecks, light and dark.
+  flecks(p: list<vec2>, r: vec2, n: i32) {
+    us = sampler(22.0 to 64.0).pick(n)
+    fs = sampler(0.05 to 0.99 with beta(2.0, 1.0)).pick(n)
+    for i in 0..n {
+      q = at(p, r, us[i], fs[i])
+      pixel(int(q.x), int(q.y), pick(#00000018, #ffffff16))
+    }
+  }
+
+  // A lighter streak through the middle of every cell between the veins.
+  cellLight(p: list<vec2>, r: vec2, gaps: list<f32>, len: f32, c: color) {
+    for i in 0..list.len(gaps) {
+      a = at(p, r, gaps[i], 0.36)
+      b = at(p, r, gaps[i], 0.84)
+      m = at(p, r, gaps[i], 0.6)
+      curve(a, m, b, len * 0.075, c)
+    }
+  }
+
+  // Light falling on the wing from above: a broad soft glow.
+  light(p: list<vec2>, r: vec2, len: f32, u: f32, c: color) {
+    centre = at(p, r, u, 0.55)
+    sizes = stepper(len * 0.25 to len * 0.9).pick(4)
+    for i in 0..4 { dot(centre, sizes[3 - i], color.set.a(c, 12)) }
+  }
+
+  baseHair(r: vec2, len: f32, hair: color, key: i32) {
+    stream_push(key)
+    for i in 0..26 {
+      a = -1.3 to 1.0
+      l = len * (0.06 to 0.20)
+      d = vec2.rot({1.0, 0.0}, a)
+      q = r + d * (len * (0.0 to 0.05))
+      e = q + d * l
+      line(q.x, q.y, e.x, e.y, 1, color.set.a(color.shade(hair, -10 to 30), 70 to 150))
+    }
+    stream_pop()
+  }
+
+  // Long fine hairs along the hindwing's inner margin, beside the abdomen.
+  innerHair(p: list<vec2>, r: vec2, len: f32, hair: color, key: i32) {
+    stream_push(key)
+    for i in 0..22 {
+      u = 64.0 to 92.0
+      q = at(p, r, u, 0.995)
+      d = vec2.rot(vec2.normalize(q - r), -0.9 to -0.3)
+      line(q.x, q.y, q.x + d.x * len * (0.03 to 0.08), q.y + d.y * len * (0.03 to 0.08), 1,
+           color.set.a(color.mix(hair, #d8d0c0, 0.3), 60 to 130))
+    }
+    stream_pop()
+  }
+
+  // An AA stroke over the polygon edge, then a short fringe of cilia.
+  edging(p: list<vec2>, r: vec2, m0: i32, m1: i32, edge: color, light: color, dark: color, checker: i32, len: f32) {
+    stroke(p, 0.9, color.set.a(edge, 200))
+    reach = max(1.6, len * 0.02)
+    for i in m0..m1 {
+      d = vec2.normalize(p[i] - r)
+      c = light
+      if (checker == 1 && (i / 3) % 2 == 0) { c = dark }
+      // Cilia: fine translucent hairs, two per outline step.
+      a = p[i] + d * 0.3
+      b = p[i] + d * reach
+      line(a.x, a.y, b.x, b.y, 1, color.set.a(c, 125))
+      m = (p[i] + p[i + 1]) * 0.5 + d * 0.3
+      e = m + d * (reach * 0.8)
+      line(m.x, m.y, e.x, e.y, 1, color.set.a(c, 90))
+    }
+  }
+
+  vein(a: vec2, b: vec2, w: f32, c: color) {
+    m = (a + b) * 0.5
+    n = vec2.normalize({b.y - a.y, a.x - b.x}) * (vec2.len(b - a) * 0.04)
+    curve(a, m + n * 0.5, m + n, w * 1.25, c)
+    curve(m + n, m + n * 0.5 + (b - m) * 0.5, b, w, color.set.a(c, c.a * 3 / 4))
+  }
+
+  foreVeins(p: list<vec2>, r: vec2, cu: f32, cl: f32, w: f32, c: color) {
+    up = at(p, r, 28.0, cu)
+    lo = at(p, r, 47.0, cl)
+    vein(r, at(p, r, 13.0, 1.0), w * 0.9, c)
+    vein(r, up, w * 1.2, c)
+    vein(r, lo, w * 1.2, c)
+    vein(up, lo, w * 0.7, c)
+    vein(r + (up - r) * 0.55, at(p, r, 17.0, 1.0), w, c)
+    vein(r + (up - r) * 0.8, at(p, r, 20.5, 1.0), w, c)
+    vein(up, at(p, r, 24.0, 1.0), w, c)
+    vein(up, at(p, r, 27.0, 1.0), w, c)
+    vein(up, at(p, r, 30.0, 1.0), w, c)
+    vein(up, at(p, r, 34.0, 1.0), w, c)
+    vein((up + lo) * 0.5, at(p, r, 40.0, 1.0), w, c)
+    vein(lo, at(p, r, 46.0, 1.0), w, c)
+    vein(r + (lo - r) * 0.8, at(p, r, 51.0, 1.0), w, c)
+    vein(r + (lo - r) * 0.55, at(p, r, 56.0, 1.0), w, c)
+    vein(r, at(p, r, 62.0, 1.0), w, c)
+  }
+
+  hindVeins(p: list<vec2>, r: vec2, cu: f32, cl: f32, w: f32, c: color) {
+    up = at(p, r, 30.0, cu)
+    lo = at(p, r, 50.0, cl)
+    vein(r, at(p, r, 18.0, 1.0), w, c)
+    vein(r, up, w * 1.2, c)
+    vein(r, lo, w * 1.2, c)
+    vein(up, lo, w * 0.7, c)
+    vein(up, at(p, r, 27.0, 1.0), w, c)
+    vein(up, at(p, r, 32.0, 1.0), w, c)
+    vein((up + lo) * 0.5, at(p, r, 38.0, 1.0), w, c)
+    vein(lo, at(p, r, 44.0, 1.0), w, c)
+    vein(r + (lo - r) * 0.8, at(p, r, 49.0, 1.0), w, c)
+    vein(r + (lo - r) * 0.55, at(p, r, 54.0, 1.0), w, c)
+    vein(r, at(p, r, 62.0, 1.0), w, c)
+    vein(r, at(p, r, 70.0, 1.0), w * 0.8, c)
+  }
+
+  // White or coloured dots in the dark rim, one or two rows between veins.
+  marginSpots(p: list<vec2>, r: vec2, gaps: list<f32>, rows: i32, rimW: f32, d: f32, c: color) {
+    outerF = 1.0 - max(rimW, 0.06) * 0.35
+    innerF = 1.0 - max(rimW, 0.06) * 0.72
+    for i in 0..list.len(gaps) {
+      u = gaps[i]
+      dot(at(p, r, u, outerF), d * 1.6, color.set.a(c, 60))
+      blob(at(p, r, u, outerF), d, c, i * 3)
+      if (rows > 1) {
+        blob(at(p, r, u - 0.8, innerF), d * 0.8, c, i * 3 + 1)
+        blob(at(p, r, u + 0.8, innerF), d * 0.8, c, i * 3 + 2)
+      }
+    }
+  }
+
+  // Blue crescents along the inner edge of a swallowtail's dark rim.
+  lunules(p: list<vec2>, r: vec2, gaps: list<f32>, rimW: f32, len: f32, c: color) {
+    f = 1.0 - rimW * 0.92
+    for i in 1..list.len(gaps) {
+      u = gaps[i]
+      a = at(p, r, u - 1.5, f)
+      b = at(p, r, u + 1.5, f)
+      m = at(p, r, u, f + 0.03)
+      curve(a, m, b, len * 0.045, color.set.a(c, 110))
+      curve(a, m, b, len * 0.026, c)
+    }
+  }
+
+  // A row of light spots across the dark apex (and the glasswing's bar).
+  subapicalSpots(p: list<vec2>, r: vec2, len: f32, kind: i32, c: color) {
+    if (kind == 3) {
+      dash(at(p, r, 18.0, 0.80), at(p, r, 33.0, 0.80), len * 0.07, color.set.a(c, 230))
+      return;
+    }
+    n = 4
+    if (kind == 2) { n = 3 }
+    us = stepper(17.0 to 31.0).pick(n)
+    for i in 0..n {
+      f = 0.80 + float(i % 2) * 0.04
+      a = at(p, r, us[i], f - 0.03)
+      b = at(p, r, us[i], f + 0.04)
+      dash(a, b, len * (0.06 - float(i) * 0.006), color.set.a(c, 70))
+      dash(a, b, len * (0.036 - float(i) * 0.004), c)
+    }
+  }
+
+  // Eyespots between the veins, drawn in two parts: part 0 paints the soft
+  // rings into the blurred art, part 1 the sharp pupil and its highlight.
+  eyeRow(p: list<vec2>, r: vec2, gaps: list<f32>, count: i32, size: f32, dark: color,
+         ring: color, pupil: color, inBand: i32, part: i32) {
+    n = list.len(gaps)
+    first = 1
+    if (count == 1) { first = 2 }
+    for i in 0..count {
+      g = gaps[min(first + i * max(1, (n - 2) / max(count, 1)), n - 1)]
+      s = size * (1.0 - 0.18 * float(i % 2))
+      if (count == 1) { s = size }
+      f = 0.70
+      if (inBand == 1) { f = 0.80 }
+      q = at(p, r, g, f)
+      eye(q, vec2.normalize(q - r), s, dark, ring, pupil, part)
+    }
+  }
+
+  // An eyespot drawn slightly long along its cell (direction d), with its
+  // pupil nudged towards the margin and a crescent of light above it.
+  eye(c: vec2, d: vec2, s: f32, dark: color, ring: color, pupil: color, part: i32) {
+    e = d * (s * 0.16)
+    if (part == 0) {
+      radii = stepper(s * 1.15 to s * 2.0).pick(5)
+      tones = stepper(color.mix(ring, dark, 0.6) to color.shade(ring, 18)).pick(5)
+      curve(c - e, c, c + e, s * 2.4, color.set.a(dark, 160))
+      for i in 0..5 { curve(c - e, c, c + e, radii[4 - i], tones[i]) }
+      curve(c - e, c, c + e, s * 1.15, dark)
+      curve(c, c + e, c + e * 1.6, s * 0.7, color.mix(pupil, dark, 0.45))
+      return;
+    }
+    q = c + d * (s * 0.12)
+    dot(q, s * 0.44, pupil)
+    curve(q + {-s * 0.34, -s * 0.02}, q + {-s * 0.12, -s * 0.44}, q + {s * 0.24, -s * 0.30},
+          max(0.8, s * 0.15), #ffffffb8)
+  }
+
+  // An irregular spot: three overlapping discs turned by the golden angle.
+  blob(q: vec2, s: f32, c: color, k: i32) {
+    a = float(k) * 2.39996
+    dot(q, s, c)
+    dot(q + {cos(a), sin(a)} * (s * 0.24), s * 0.72, c)
+    dot(q + {cos(a + 2.2), sin(a + 2.2)} * (s * 0.22), s * 0.62, c)
+  }
+
+  // Swallowtail's orange and blue anal spot, or the admiral's blue one.
+  analSpot(p: list<vec2>, r: vec2, s: f32, kind: i32, a: color, b: color, dark: color) {
+    c = at(p, r, 58.0, 0.84)
+    if (kind == 1) {
+      dot(c, s * 1.7, color.mix(#e85a1a, a, 0.2))
+      dot(c, s * 0.9, b)
+      dot(c + {0.0, s * 0.35}, s * 0.7, dark)
+    } else {
+      dot(c, s * 1.3, b)
+      dot(c, s * 0.6, dark)
+    }
+  }
+
+  // Tiger stripes running back from the costa, shortening towards the apex.
+  tigerStripes(p: list<vec2>, r: vec2, len: f32, count: i32, c: color, key: i32) {
+    stream_push(key)
+    starts = stepper(4.0 to 19.0).pick(count)
+    for i in 0..count {
+      u = starts[i] + (-0.8 to 0.8)
+      reach = 1.02 - float(i) * (0.10 to 0.16)
+      a = at(p, r, u, 1.06)
+      b = at(p, r, 90.0 - float(i) * (6.0 to 8.0), reach)
+      m = (a + b) * 0.5 + (r - (a + b) * 0.5) * (0.0 to 0.12)
+      w = len * (0.055 to 0.09)
+      curve(a, m, b, w * 1.3, color.set.a(c, 80))
+      curve(a, m, b, w, c)
+    }
+    stream_pop()
+  }
+
+  // A broad band across the wing from the costa towards the tornus, bowed
+  // towards the root.
+  band(p: list<vec2>, r: vec2, len: f32, uc: f32, ut: f32, bow: f32, width: f32, c: color) {
+    a = at(p, r, uc, 1.06)
+    b = at(p, r, ut, 1.06)
+    m = at(p, r, (uc + ut) * 0.5, bow)
+    if (width < len * 0.15) { curve(a, m, b, width * 1.25, color.set.a(c, 90)) }
+    curve(a, m, b, width, c)
+  }
+
+  // Coloured rays along the cells of the hindwing (longwings).
+  hindRays(p: list<vec2>, r: vec2, len: f32, c: color) {
+    for i in 0..6 {
+      u = 28.0 + float(i) * 5.5
+      curve(at(p, r, u, 0.42), at(p, r, u, 0.65), at(p, r, u, 0.9), len * 0.05, color.set.a(c, 170))
+    }
+  }
+
+  // Rows of dark spots and chevrons between the veins (fritillaries).
+  spotField(p: list<vec2>, r: vec2, len: f32, gaps: list<f32>, rows: i32, c: color, key: i32) {
+    stream_push(key)
+    levels = stepper(0.42 to 0.86).pick(rows)
+    for k in 0..rows {
+      for i in 0..list.len(gaps) {
+        if (chance(0.85)) {
+          q = at(p, r, gaps[i] + (-0.7 to 0.7), levels[k] + (-0.03 to 0.03))
+          if (k == rows - 1 && rows > 2) {
+            w = at(p, r, gaps[i] - 1.4, levels[k] - 0.04)
+            e = at(p, r, gaps[i] + 1.4, levels[k] - 0.04)
+            curve(w, q + (q - (w + e) * 0.5) * 0.6, e, len * 0.018, c)
+          } else {
+            s = len * (0.022 to 0.04)
+            dot(q, s * 1.7, color.set.a(c, 55))
+            blob(q, s, c, k * 11 + i)
+          }
+        }
+      }
+    }
+    stream_pop()
+  }
+
+  // Bars and spots in and at the end of the discal cell.
+  discalSpots(p: list<vec2>, r: vec2, len: f32, count: i32, c: color) {
+    dot(at(p, r, 38.0, 0.56), len * 0.09, color.set.a(c, 60))
+    blob(at(p, r, 38.0, 0.56), len * 0.055, c, 5)
+    if (count > 1) { blob(at(p, r, 48.0, 0.64), len * 0.045, c, 9) }
+    if (count > 2) {
+      dash(at(p, r, 27.0, 0.36), at(p, r, 45.0, 0.30), len * 0.02, c)
+      dash(at(p, r, 28.0, 0.24), at(p, r, 45.0, 0.20), len * 0.02, c)
+    }
+  }
+
+  // Thin wavy lines parallel to the margin (satyrs, viceroy).
+  wavy(p: list<vec2>, r: vec2, u0: f32, u1: f32, f: f32, len: f32, c: color) {
+    steps = 10
+    for i in 0..steps {
+      ua = u0 + (u1 - u0) * float(i) / float(steps)
+      ub = u0 + (u1 - u0) * float(i + 1) / float(steps)
+      fa = f + 0.03 * sin(float(i) * 2.1)
+      fb = f + 0.03 * sin(float(i + 1) * 2.1)
+      dash(at(p, r, ua, fa), at(p, r, ub, fb), max(0.9, len * 0.012), c)
+    }
+  }
+
+  // ---------------------------------------------------------------- motifs
+
+  // The motif's soft share, painted into the art before the blur.
+  motifArt(figure: i32, p: list<vec2>, r: vec2, len: f32, gaps: list<f32>, m0: i32, m1: i32,
+           key: i32, glow: color, ink: color) {
+    if (figure == 2) { ripples(p, r, key, color.set.a(glow, 120), color.set.a(ink, 80), 2.2) }
+    else if (figure == 3) { marble(p, len, key, color.set.a(glow, 230), color.set.a(ink, 170)) }
+    else if (figure == 4) { lace(p, r, gaps, len, m0, m1, 2.2, color.set.a(glow, 90)) }
+    else if (figure == 6) { orbs(p, r, gaps, len, key, glow, ink, 0) }
+    else if (figure == 7) { sunburst(p, r, gaps, color.set.a(glow, 130), color.set.a(ink, 85)) }
+    else if (figure == 8) { shimmer(p, r, len, key, 72) }
+    else if (figure == 9) { pearls(p, r, len, m0, m1, 1.8, color.set.a(glow, 80)) }
+  }
+
+  // The motif's crisp share, painted over the scales. The single program
+  // leaves the ripples soft.
+  motifSharp(figure: i32, p: list<vec2>, r: vec2, len: f32, gaps: list<f32>, m0: i32, m1: i32,
+             key: i32, glow: color, ink: color, detail: i32) {
+    if (figure == 2 && detail == 1) { ripples(p, r, key, color.set.a(glow, 80), color.set.a(ink, 50), 0.8) }
+    else if (figure == 4) { lace(p, r, gaps, len, m0, m1, 1.0, color.set.a(glow, 245)) }
+    else if (figure == 5) { stardust(p, r, len, key, glow) }
+    else if (figure == 6) { orbs(p, r, gaps, len, key, glow, ink, 1) }
+    else if (figure == 9) { pearls(p, r, len, m0, m1, 1.0, glow) }
+  }
+
+  // Agate ripples: rings of the outline, wobbled, alternately pale and dark.
+  ripples(p: list<vec2>, r: vec2, key: i32, pale: color, dark: color, width: f32) {
+    stream_push(key)
+    n = 5 to 9
+    fs = stepper(0.26 to 0.93).pick(n)
+    wave = waves(float(key & 255) + 11.0)
+    for i in 0..n {
+      c = pale
+      if (i % 2 == 1) { c = dark }
+      wideStroke(scw(p, r, fs[i] + (-0.02 to 0.02), 0.06, wave), width * (0.7 to 1.3), c)
+    }
+    stream_pop()
+  }
+
+  // Marbling: thin stripes of domain-warped noise, pale veins and dark ones.
+  marble(p: list<vec2>, len: f32, key: i32, pale: color, dark: color) {
+    b = box(p)
+    s = 2.4 / len
+    for y in int(b[0].y)..int(b[1].y) {
+      fy = float(y) * s
+      for x in int(b[0].x)..int(b[1].x) {
+        fx = float(x) * s
+        v = sin((warp(fx, fy, 2.2, key) * 2.6 + fx * 0.5 + fy * 0.3) * 6.2831853)
+        if (v > 0.6) { pixel(x, y, color.set.a(pale, int((v - 0.6) * 2.5 * float(pale.a)))) }
+        else if (v < -0.75) { pixel(x, y, color.set.a(dark, int((-v - 0.75) * 4.0 * float(dark.a)))) }
+      }
+    }
+  }
+
+  // Lace: a dotted line inside the margin, a scallop over every cell and a
+  // bead under it.
+  lace(p: list<vec2>, r: vec2, gaps: list<f32>, len: f32, m0: i32, m1: i32, width: f32, c: color) {
+    for i in m0..m1 { dot(at(p, r, float(i) + 0.5, 0.93), max(1.3, len * 0.014) * width, c) }
+    for i in 0..list.len(gaps) {
+      g = gaps[i]
+      curve(at(p, r, g - 1.7, 0.85), at(p, r, g, 0.68), at(p, r, g + 1.7, 0.85), max(1.0, len * 0.011) * width, c)
+      dot(at(p, r, g, 0.79), max(2.0, len * 0.03) * width, c)
+    }
+  }
+
+  // Stardust: stars of every size, the largest with four rays, and one
+  // small constellation.
+  stardust(p: list<vec2>, r: vec2, len: f32, key: i32, c: color) {
+    stream_push(key)
+    n = 30 to 50
+    us = sampler(21.0 to 63.0).pick(n)
+    fs = sampler(0.2 to 0.95 with beta(2.0, 1.4)).pick(n)
+    for i in 0..n {
+      q = at(p, r, us[i], fs[i])
+      s = 0.8 to 2.8 with beta(1.2, 3.0, 0.8, 2.8)
+      dot(q, s * 3.4, color.set.a(c, 40))
+      dot(q, s, c)
+      if (s > 1.6) {
+        reach = s * 2.8
+        line(q.x - reach, q.y, q.x + reach, q.y, 1, color.set.a(c, 110))
+        line(q.x, q.y - reach, q.x, q.y + reach, 1, color.set.a(c, 110))
+      }
+    }
+    u = 26.0 to 56.0
+    f = 0.45 to 0.8
+    prev = at(p, r, u, f)
+    for i in 0..5 {
+      u = clamp(u + (-4.0 to 4.0), 21.0, 63.0)
+      f = clamp(f + (-0.12 to 0.12), 0.25, 0.92)
+      q = at(p, r, u, f)
+      line(prev.x, prev.y, q.x, q.y, 1, color.set.a(c, 70))
+      dot(q, 5.0, color.set.a(c, 40))
+      dot(q, 1.8, color.set.a(c, 240))
+      prev = q
+    }
+    stream_pop()
+  }
+
+  // Orbs: translucent bubbles in the cells; part 0 their soft glow, part 1
+  // the bubble with its lit rim and highlight.
+  orbs(p: list<vec2>, r: vec2, gaps: list<f32>, len: f32, key: i32, a: color, b: color, part: i32) {
+    stream_push(key)
+    for i in 0..list.len(gaps) {
+      show = chance(0.75)
+      q = at(p, r, gaps[i] + (-0.6 to 0.6), 0.42 to 0.86)
+      s = len * (0.08 to 0.15)
+      c = a
+      if (chance(0.4)) { c = b }
+      if (show == 1 && part == 0) { dot(q, s * 1.5, color.set.a(c, 80)) }
+      if (show == 1 && part == 1) {
+        dot(q, s, color.set.a(c, 120))
+        dot(q, s * 0.8, color.set.a(color.mix(c, #ffffff, 0.35), 70))
+        dot(q + {-s * 0.16, -s * 0.18}, s * 0.26, #ffffffa0)
+      }
+    }
+    stream_pop()
+  }
+
+  // Tongues of flame licking out along every cell, a white-hot line in each
+  // (with detail).
+  flames(p: list<vec2>, r: vec2, gaps: list<f32>, len: f32, key: i32, c: color, detail: i32) {
+    stream_push(key)
+    for i in 0..list.len(gaps) {
+      g = gaps[i] + (-0.5 to 0.5)
+      sway = 0.6 to 1.4
+      if (chance(0.5)) { sway = -sway }
+      // An S of two strokes, tapering from a broad base to a fine tip.
+      w = len * (0.07 to 0.1)
+      a = at(p, r, g, 0.28 to 0.4)
+      m = at(p, r, g + sway, 0.52)
+      n = at(p, r, g, 0.68 to 0.74)
+      q = at(p, r, g - sway, 0.84)
+      e = at(p, r, g + sway * 0.4, 0.95 to 1.03)
+      curve(a, m, n, w, color.set.a(c, 110))
+      curve(n, q, e, w * 0.55, color.set.a(c, 120))
+      if (detail == 1) {
+        curve(a, m, n, w * 0.45, color.set.a(color.mix(c, #ffffff, 0.5), 140))
+        curve(n, q, e, w * 0.25, color.set.a(color.mix(c, #ffffff, 0.5), 150))
+      }
+    }
+    stream_pop()
+  }
+
+  // Sunburst: soft rays from the root, one along every cell.
+  sunburst(p: list<vec2>, r: vec2, gaps: list<f32>, a: color, b: color) {
+    for i in 0..list.len(gaps) {
+      c = a
+      if (i % 2 == 1) { c = b }
+      g = gaps[i]
+      poly([at(p, r, g, 0.1), at(p, r, g - 1.2, 0.99), at(p, r, g + 1.2, 0.99)], c)
+    }
+  }
+
+  // A holographic sheen: the hue turns with the angle about the root and
+  // the distance from it, broken a little by noise. It lies under the blur,
+  // so it is computed in blocks of two by two pixels.
+  shimmer(p: list<vec2>, r: vec2, len: f32, key: i32, alpha: i32) {
+    b = box(p)
+    turn = float(key & 1023) / 1024.0
+    for by in int(b[0].y) / 2..int(b[1].y) / 2 + 1 {
+      y = by * 2
+      dy = float(y) + 1.0 - r.y
+      for bx in int(b[0].x) / 2..int(b[1].x) / 2 + 1 {
+        x = bx * 2
+        dx = float(x) + 1.0 - r.x
+        h = turn + atan2(dy, dx) * 0.4 + sqrt(dx * dx + dy * dy) / len * 1.2
+            + noise.grad(float(x) * 0.06, float(y) * 0.06, key) * 0.2
+        rect(x, y, 2, 2, color.set.a(hsvColor(h, 0.6, 1.0), alpha))
+      }
+    }
+  }
+
+  // Pearls: two rows of beads along the margin, each with a highlight.
+  pearls(p: list<vec2>, r: vec2, len: f32, m0: i32, m1: i32, spread: f32, c: color) {
+    for k in 0..2 {
+      f = 0.86 - float(k) * 0.14
+      s = len * (0.042 - float(k) * 0.01)
+      for i in m0 / 2..m1 / 2 {
+        q = at(p, r, float(i * 2 + k), f)
+        dot(q, s * spread, c)
+        if (spread < 1.5) { dot(q + {-s * 0.18, -s * 0.2}, s * 0.36, #ffffffb0) }
+      }
+    }
+  }
+
+  antennaDraw(rootY: f32, fore: f32, thorax: f32, antenna: f32, angle: f32, hair: color, tip: color, look: i32) {
+    headR = max(2.5, fore * 0.045)
+    headY = rootY - thorax * fore * 0.72 - headR * 0.75
+    base = {headR * 0.42, headY - headR * 0.72}
+    d = dir(angle)
+    len = antenna * fore
+    end = base + d * len
+    bend = base + dir(angle - 8.0) * (len * 0.55)
+    shaft = color.shade(hair, -20)
+    curve(base, bend, end, max(0.9, fore * 0.009), shaft)
+    if (look == 1 || look == 6 || look == 8) {
+      for i in 1..9 {
+        t = float(i) / 10.0
+        q = base * ((1.0 - t) * (1.0 - t)) + bend * (2.0 * t * (1.0 - t)) + end * (t * t)
+        dot(q, max(0.8, fore * 0.008), color.set.a(#f0ece0, 150))
+      }
+    }
+    club = end - d * (len * 0.16)
+    curve(club, (club + end) * 0.5, end, max(2.0, fore * 0.026), shaft)
+    dot(end - d * (len * 0.03), max(1.2, fore * 0.014), tip)
+  }
+}

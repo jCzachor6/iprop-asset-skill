@@ -1,0 +1,9 @@
+// Lint fixture: the highlight sits at the lower right, against the upper-left light of the house style.
+asset Backlit {
+  size 32x32
+  draw {
+    oval(16, 16, 11, 11, #1c2630)
+    oval(16, 16, 10, 10, #3a4a5a)
+    oval(19, 19, 5, 5, #a0b0c0)
+  }
+}

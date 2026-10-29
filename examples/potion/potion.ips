@@ -1,0 +1,496 @@
+// potion.ips — an RPG potion generator, composed from four parts, one per
+// characteristic feature of a potion, and one material library:
+//   vessel.ips    — the glass body with its liquid
+//   neck.ips      — the neck and its lip
+//   cork.ips      — the stopper
+//   seal.ips      — a short neck binding with an apothecary seal
+//   materials.ips — cork, pewter, slate, cloth, wax, paper, brass, twine,
+//                   parchment, gold and etching, shared by all of them
+//
+// A seed alone gives a completely random potion: one of seventeen silhouette
+// families, its proportions, the glass tint (derived from the liquid colour
+// via color.hsv — analog, complementary or same hue), the neck, the stopper,
+// a glass decoration and sometimes a small tied apothecary seal.
+//
+// Inputs:
+//   fill    0 rolls; 1 nearly full .. 5 nearly empty
+//   style   0 rolls; 1 ornate (every decoration kind, optional neck seal,
+//           one kind of wear), 2 plain (sticker or tag only, no seal by
+//           default, little wear), 3 arcane (rune etch or rune circle, neck
+//           seal always, frost often)
+//   liquid  transparent rolls the liquid colour; any other colour sets it
+//   seal    0 follows the style; 1 wax, 2 folded paper, 3 brass, 4 none
+// Outputs:
+//   anchor    the foot of the vessel, where it stands
+//   collider  the bounds of the glass, the neck and the stopper
+//
+// The vessel fits the decoration inside the glass (moving or shrinking it)
+// and fits the seal against the shoulder; both come back through
+// vessel.outputs (label, labelfit, charm), which the host sees as well.
+//
+// Variety: extreme
+
+import vessel from "vessel.ips"
+import neck from "neck.ips"
+import cork from "cork.ips"
+import sealPart from "seal.ips"
+import mats from "materials.ips"
+
+asset Potion {
+  size 64x64
+  input u32 fill = 0         // 0 rolls; 1 nearly full .. 5 nearly empty
+  input u32 style = 0        // 0 rolls; 1 ornate, 2 plain, 3 arcane
+  input color liquid = #00000000 // transparent rolls one
+  input u32 seal = 0         // 0 follows the style; 1 wax, 2 paper, 3 brass, 4 none
+
+  output point anchor
+  output rect collider
+
+  const sampler<f32> proportions = sampler(0.0 to 1.0 with gaussian(0.5, 0.22))
+  // Each entry is a captured gradient: selecting a family does not draw it.
+  palette elixirs = [#751e35 to #f36b80, #ae3924 to #ffb04e,
+                     #9e651c to #f8d36a, #3a741f to #b1e86b,
+                     #166450 to #6ce0b0, #175f7f to #69d7f0,
+                     #273987 to #809cf0, #582788 to #c28aef,
+                     #902978 to #ef92cd, #6b484d to #d89a96,
+                     #c6c9b0 to #faf4da, #182641 to #4a5c91]
+
+  // Stream keys, one per purpose: hash(start ^ key) seeds that purpose's
+  // stream or single choice, and each part draws from a key of its own.
+  // Keep them fixed once a game stores seeds.
+  const i32 fillKey = 0x2f6b9a13
+  const i32 styleKey = 0x6c8e9cf5
+  const i32 liquidKey = 0x7f4a7c15
+  const i32 silhouetteKey = 0x51ed2701
+  const i32 neckShapeKey = 0x2545f491
+  const i32 decorKey = 0x3c6ef372
+  const i32 vesselKey = 0x85ebca6b
+  const i32 neckKey = 0xc2b2ae35
+  const i32 corkKey = 0x9e3779b9
+  const i32 sealKey = 0x42d3a765
+
+  draw {
+    start = seed
+    // ---- fill and style -------------------------------------------------
+    // 0 rolls from the seed, so a seed alone gives a completely random
+    // potion; k > 0 forces level (style) k. The rolls hash the seed rather
+    // than draw from the stream, so a rolled pick renders exactly like the
+    // explicit one it chose.
+    fillStep = clamp(fill, 1, 5) - 1
+    if (fill == 0) { fillStep = md(hash(start ^ fillKey), 5) }
+    look = clamp(style, 1, 3) - 1
+    if (style == 0) { look = md(hash(start ^ styleKey), 3) }
+    stream_push(hash(start ^ liquidKey))
+    liq = elixirs[index(12)].pick()
+    stream_pop()
+    if (liquid.a != 0) { liq = liquid }
+
+    // ---- roll the silhouette family and its proportions ----------------
+    stream_push(hash(start ^ silhouetteKey))
+    fam = 0 to 16
+    bFoot = 3.0
+
+    if (fam == 0) {
+      // round
+      bStyle = 0; bHW = proportion(8.0, 17.0); bBot = proportion(52.0, 57.0)
+      bTop = bBot - bHW * 2.0; bTW = proportion(2.5, 4.0)
+      symY = bTop + (bBot - bTop) * 0.58; symW = bHW * 0.94; symWob = 4.0
+    } else if (fam == 1) {
+      // capsule vial
+      bStyle = 1; bHW = proportion(4.5, 9.0); bBot = proportion(53.5, 56.0)
+      bTop = bBot - (proportion(18.0, 34.0)); bTW = bHW
+      symY = bTop + (bBot - bTop) * 0.50; symW = bHW; symWob = 3.0
+    } else if (fam == 2) {
+      // conical flask
+      bStyle = 2; bHW = proportion(9.0, 15.0); bBot = proportion(53.0, 56.0)
+      bTop = bBot - (proportion(16.0, 28.0)); bTW = proportion(3.0, 5.5)
+      symY = bTop + (bBot - bTop) * 0.62; symW = bTW + (bHW - bTW) * 0.62 - 1.2; symWob = 4.0
+    } else if (fam == 3) {
+      // squat jar
+      bStyle = 3; bHW = proportion(8.0, 15.0); bBot = proportion(53.0, 56.0)
+      bTop = bBot - (proportion(12.0, 22.0)); bTW = proportion(3.5, 6.5)
+      symY = (bTop + bBot) / 2.0 + 1.0; symW = bHW - 0.5; symWob = 2.0
+    } else if (fam == 4) {
+      // teardrop
+      bStyle = 4; bHW = proportion(9.0, 15.0); bBot = proportion(53.0, 57.0)
+      bTop = bBot - (proportion(20.0, 33.0)); bTW = proportion(2.5, 4.5)
+      symY = bTop + (bBot - bTop) * 0.64; symW = bHW * 0.94; symWob = 3.0
+    } else if (fam == 5) {
+      // tall oval
+      bStyle = 5; bHW = proportion(9.0, 16.0); bBot = proportion(53.0, 57.0)
+      bTop = bBot - (proportion(22.0, 38.0)); bTW = proportion(2.5, 4.5)
+      symY = bTop + (bBot - bTop) * 0.60; symW = bHW * 0.95; symWob = 3.0
+    } else if (fam == 6) {
+      // banded vial
+      bStyle = 6; bHW = proportion(5.5, 9.0); bBot = proportion(53.5, 56.0)
+      bTop = bBot - (proportion(18.0, 32.0)); bTW = bHW
+      symY = bTop + (bBot - bTop) * 0.50; symW = bHW - 0.5; symWob = 3.0
+    } else if (fam == 7) {
+      // diamond
+      bStyle = 7; bHW = proportion(9.0, 15.0); bBot = proportion(53.0, 57.0)
+      bTop = bBot - (proportion(18.0, 30.0)); bTW = proportion(2.5, 4.0)
+      symY = (bTop + bBot) / 2.0 + (bBot - bTop) * 0.05; symW = bHW * 0.90 - 2.5; symWob = 2.5
+    } else if (fam == 8) {
+      // double bulb
+      bStyle = 8; bHW = proportion(7.0, 12.0); bTW = proportion(4.5, 8.0)
+      bBot = proportion(54.0, 57.0)
+      bTop = bBot - (bHW + bTW + 4.0 + (proportion(0.0, 4.0)))
+      symY = bBot - bHW * 0.55; symW = bHW * 0.85; symWob = 2.5
+    } else if (fam == 9) {
+      // box bottle
+      bStyle = 9; bHW = proportion(8.0, 15.0); bBot = proportion(52.5, 57.0)
+      bTop = bBot - (proportion(13.0, 24.0)); bTW = proportion(4.0, 6.0)
+      symY = (bTop + bBot) / 2.0 + 1.0; symW = bHW - 0.5; symWob = 2.5
+    } else if (fam == 10) {
+      // amphora
+      bStyle = 10; bHW = proportion(9.0, 13.0); bTW = proportion(2.5, 4.0)
+      bFoot = proportion(3.0, 4.5); bBot = proportion(53.5, 57.0)
+      bTop = bBot - (proportion(20.0, 27.0))
+      symY = bTop + (bBot - bTop) * 0.36; symW = bHW * 0.9; symWob = 3.0
+    } else if (fam == 11) {
+      // jug with spout
+      bStyle = 11; bHW = proportion(8.0, 12.0); bBot = proportion(53.0, 56.0)
+      bTop = bBot - (proportion(13.0, 19.0)); bTW = proportion(4.0, 6.0)
+      symY = (bTop + bBot) / 2.0 + 1.0; symW = bHW - 0.5; symWob = 2.0
+    } else if (fam == 12) {
+      // handled bottle
+      bStyle = 12; bHW = proportion(9.0, 14.0); bBot = proportion(53.0, 56.0)
+      bTop = bBot - bHW * 2.0; bTW = proportion(3.0, 4.5)
+      symY = bTop + (bBot - bTop) * 0.60; symW = bHW * 0.9; symWob = 3.0
+    } else if (fam == 13) {
+      // sphere on foot
+      bStyle = 13; bHW = proportion(8.0, 12.0); bTW = proportion(2.2, 3.4)
+      bBot = proportion(54.5, 57.0)
+      bTop = bBot - (2.0 * bHW + 4.0 + (proportion(0.0, 3.0)))
+      symY = bTop + bHW * 1.15; symW = bHW * 0.9; symWob = 2.0
+    } else if (fam == 14) {
+      // prism
+      bStyle = 14; bHW = proportion(9.0, 14.0); bTW = proportion(6.0, 9.0)
+      bFoot = proportion(6.0, 9.0); bBot = proportion(53.0, 57.0)
+      bTop = bBot - (proportion(20.0, 27.0))
+      symY = (bTop + bBot) / 2.0 + 1.0; symW = bHW * 0.75; symWob = 2.0
+    } else if (fam == 15) {
+      // inverted teardrop
+      bStyle = 15; bHW = proportion(9.0, 15.0); bBot = proportion(53.0, 57.0)
+      bTop = bBot - (proportion(22.0, 32.0)); bTW = proportion(2.5, 4.0)
+      symY = bTop + (bBot - bTop) * 0.36; symW = bHW * 0.85; symWob = 2.5
+    } else {
+      // gourd: small head over a big belly
+      bStyle = 8; bHW = proportion(8.0, 12.0); bTW = proportion(3.0, 4.5)
+      bBot = proportion(54.0, 57.0)
+      bTop = bBot - (bHW + bTW + 6.0 + (proportion(0.0, 4.0)))
+      symY = bBot - bHW * 0.55; symW = bHW * 0.85; symWob = 2.5
+    }
+
+    // Mouth reference for the neck; bulb families join at their top bulb.
+    mouthW = bTW
+    nBase = bTop + 1.0
+    if (fam == 8 || fam == 16) {
+      mouthW = bTW * 0.7
+      nBase = bTop + bTW * 0.35
+    }
+
+    stream_pop()
+
+    // ---- glass tint from the liquid (hue family) -----------------------
+    gRel = 0 to 2
+    gShift = (-1.0 to 1.0) * 0.06
+    if (gRel == 1) { gShift = 0.42 to 0.58 }
+    else if (gRel == 2) { gShift = (-1.0 to 1.0) * 0.02 }
+    gSat = 0.50 to 0.75
+    gVal = 0.30 to 0.46
+
+    frosty = 0
+    if (look == 1) {
+      if (chance(1.0 / 6.0)) { frosty = 1 }
+    } else if (look == 2) {
+      if (chance(2.0 / 3.0)) { frosty = 1 }
+    } else {
+      if (chance(0.25)) { frosty = 1 }
+    }
+    if (look == 1) {
+      gSat = 0.20 to 0.35
+      gVal = 0.26 to 0.38
+    } else if (look == 2) {
+      gSat = 0.35 to 0.6
+      gVal = 0.40 to 0.58
+    }
+    if (frosty == 1) {
+      gShift = 0.45 to 0.55
+      gSat = 0.15 to 0.25
+      gVal = 0.52 to 0.67
+    }
+    gcol = color.hsv(liq, gShift, gSat, gVal)
+
+    // ---- shared rolls --------------------------------------------------
+    fullness = 0.92 - float(fillStep) * 0.16
+    level = bBot - fullness * (bBot - bTop)
+
+    // ---- glass wear: at most one kind, so the small sprite stays clean --
+    hasDew = 0; hasDrips = 0; hasScrat = 0
+    wear = 0
+    if (look == 1) {
+      if (chance(1.0 / 3.0)) { wear = 1 }
+    } else if (look == 2) {
+      wear = 1 to 3
+    } else {
+      wear = 0 to 3
+    }
+    if (wear == 1) { hasDew = 1 }
+    else if (wear == 2) { hasDrips = 1 }
+    else if (wear == 3) { hasScrat = 1 }
+
+    // ---- decoration placement ------------------------------------------
+    if (look == 1) {
+      decoKind = 0 to 1
+      bare = chance(0.5)
+    } else if (look == 2) {
+      decoKind = (2 to 3) * 2
+      bare = 0
+    } else {
+      decoKind = 0 to 5
+      bare = chance(0.2)
+    }
+    sym = 0 to 10
+    symS = clamp(symW * (0.20 to 0.28), 2.0, 4.2)
+    symJit = -1.0 to 1.0
+    symY = symY + (-1.0 to 1.0) * symWob
+    // Half extents of each decoration at scale 1, for the vessel to fit.
+    if (decoKind == 0) { dRX = symS + 1.4; dRY = dRX }
+    else if (decoKind == 1) { dRX = symS * 1.15 + 0.6; dRY = symS * 0.75 + 0.6 }
+    else if (decoKind == 2) { dRX = symS * 1.3 + 0.4; dRY = dRX }
+    else if (decoKind == 3) { dRX = 3.0; dRY = 1.3; symJit = 0.0 }
+    else if (decoKind == 4) { dRX = symS + 1.5; dRY = dRX }
+    else { dRX = 3.0; dRY = 4.4; symJit = 0.0 }
+
+    // ---- neck ----------------------------------------------------------
+    stream_push(hash(start ^ neckShapeKey))
+    nStyle = 0 to 6
+    if (nStyle == 0) {
+      nH = proportion(3.5, 6.0)
+      nBW = clamp(mouthW * (proportion(0.80, 1.1)), 2.2, 5.0)
+      nTW = nBW
+    } else if (nStyle == 1) {
+      nH = proportion(7.0, 11.0)
+      nBW = clamp(mouthW * 0.5, 2.0, 3.2)
+      nTW = nBW
+    } else if (nStyle == 2) {
+      nH = proportion(5.0, 8.0)
+      nBW = clamp(mouthW * (proportion(0.65, 0.9)), 2.0, 4.5)
+      nTW = clamp(nBW + 1.0 + (proportion(0.0, 1.2)), 2.5, 6.0)
+    } else if (nStyle == 3) {
+      nH = proportion(6.0, 9.0)
+      nBW = clamp(mouthW * (proportion(0.85, 1.15)), 2.2, 5.0)
+      nTW = nBW * (proportion(0.70, 0.9))
+    } else if (nStyle == 4) {
+      nH = proportion(3.0, 5.0)
+      nBW = clamp(mouthW * (proportion(0.90, 1.2)), 2.5, 5.5)
+      nTW = nBW
+    } else if (nStyle == 5) {
+      nH = proportion(4.5, 7.0)
+      nBW = clamp(mouthW * (proportion(0.85, 1.15)), 2.2, 5.5)
+      nTW = nBW
+    } else {
+      nH = proportion(6.0, 8.0)
+      nBW = clamp(mouthW * (proportion(0.90, 1.3)), 2.5, 6.0)
+      nTW = nBW * (proportion(0.50, 0.7))
+    }
+
+    // ---- stopper -------------------------------------------------------
+    cStyle = 0 to 7
+    cW = clamp(nTW + 0.5 + (proportion(0.0, 1.5)), 3.2, 6.2)
+    if (cStyle == 1) { cH = proportion(3.8, 5.0) }
+    else if (cStyle == 2) { cH = proportion(3.5, 5.5) }
+    else if (cStyle == 3) { cH = proportion(6.0, 9.0) }
+    else if (cStyle == 4) { cH = proportion(5.0, 7.0) }
+    else if (cStyle == 5) { cH = proportion(3.5, 5.0) }
+    else if (cStyle == 6) { cH = proportion(3.5, 5.0) }
+    else if (cStyle == 7) { cH = proportion(5.5, 7.5) }
+    else { cH = proportion(5.0, 7.5) }
+
+    corkBase = nBase - nH
+    if (corkBase - cH < 3.5) { cH = max(corkBase - 3.5, 2.8); }
+    stream_pop()
+
+    // ---- decoration materials, in a stream of their own ---------------
+    stream_push(hash(start ^ decorKey))
+    paper = mats.Parchment()
+    gold = mats.Gold()
+    etching = mats.Etching()
+    stream_pop()
+
+    // ---- short neck seals ---------------------------------------------
+    // Keep the fastening close to the collar, resting against the shoulder.
+    trinket = 0
+    if (look == 0) {
+      if (chance(0.5)) { trinket = 1 to 3 }
+    } else if (look == 2) {
+      trinket = 1 to 3
+    }
+    if (seal >= 1 && seal <= 4) { trinket = int(seal) % 4 }
+    chR = 4.0
+    if (trinket == 2) { chR = 4.2 }
+    chSide = 0 to 1
+    if (bStyle == 11 || bStyle == 12) { chSide = 1 }
+    tieY = min(corkBase + 4.5, nBase - 0.5)
+    chY = tieY + 5.7 + lerp(-0.35, 0.35, 0.0 to 1.0 with gaussian(0.5, 0.18))
+    pebble = 0 to 1
+
+    // ---- compose: vessel, glass decoration, neck, cork, seal ------------
+    layer potionImage(alpha=surface.source_over) {
+    vessel.draw(hash(start ^ vesselKey), at = {0, 0},
+                style = bStyle, cx = 32.0, top = bTop, bot = bBot, hw = bHW,
+                topw = bTW, footw = bFoot, level = level, liquid = liq,
+                glass = gcol, frost = frosty, dew = hasDew, drips = hasDrips,
+                scratch = hasScrat, labely = symY, labelrx = dRX, labelry = dRY,
+                labeljit = symJit, charmy = chY, charmr = chR, charmside = chSide)
+    labelAt = vessel.outputs.label
+    labelFit = vessel.outputs.labelfit
+    charmAt = vessel.outputs.charm
+    symS = symS * min(labelFit.x, 1.0)
+    if (labelFit.x < 0.6) { bare = 1 }
+    clip(vessel.outputs.interior) {
+    if (bare == 0) {
+      if (decoKind == 0) { sticker(labelAt.x, labelAt.y, symS, sym, paper) }
+      else if (decoKind == 1) { tag(labelAt.x, labelAt.y, symS, sym, paper) }
+      else if (decoKind == 2) { etch(labelAt.x, labelAt.y, symS, sym, etching) }
+      else if (decoKind == 3) { gild(32.0, labelAt.y, labelFit.y + 0.7, gold) }
+      else if (decoKind == 4) { runeCircle(labelAt.x, labelAt.y, symS, sym, gold, etching) }
+      else { speckles(32.0, labelAt.y, labelFit.y, gold) }
+    }
+    }
+    neck.draw(hash(start ^ neckKey), at = {0, 0},
+              style = nStyle, cx = 32.0, base = nBase, height = nH, botw = nBW,
+              topw = nTW, glass = gcol)
+    cork.draw(hash(start ^ corkKey), at = {0, 0},
+              style = cStyle, cx = 32.0, base = corkBase, w = cW, h = cH,
+              liquid = liq)
+    if (trinket != 0) {
+      sealPart.draw(hash(start ^ sealKey), at = charmAt,
+                    style = trinket, stamp = pebble, tint = liq,
+                    neckDX = 32.0 - charmAt.x, neckDY = tieY - charmAt.y, neckHalf = nTW + 0.8)
+    }
+    }
+    surface.paint(potionImage, blend=surface.source_over)
+
+    // ---- outputs for the game -------------------------------------------
+    // The foot of the vessel, and the bounds of glass, neck and stopper; a
+    // jug's spout and a bottle's handle reach past the body.
+    anchor = {32.0, bBot}
+    reach = bHW + 1.5
+    if (bStyle == 11 || bStyle == 12) { reach = bHW + 4.5 }
+    collider = {32.0 - reach, corkBase - cH, reach * 2.0, bBot + 1.0 - (corkBase - cH)}
+  }
+
+  proportion(lower: f32, upper: f32) -> f32 {
+    return lerp(lower, upper, proportions.pick())
+  }
+
+  // ---- glass decorations ----------------------------------------------
+  // Parchment disc with an ink symbol.
+  sticker(sx: f32, sy: f32, s: f32, sym: i32, p: mats.Parchment) {
+    oval(sx, sy, s + 1.4, s + 1.4, p.edge)
+    oval(sx, sy, s + 0.7, s + 0.7, p.base)
+    decoSymbol(sx, sy, s, sym, p.ink, p.base)
+  }
+
+  // Parchment tag: a small symbol and three lines of writing.
+  tag(sx: f32, sy: f32, s: f32, sym: i32, p: mats.Parchment) {
+    hw = s * 1.15
+    hh = s * 0.75
+    rect(sx - hw - 0.6, sy - hh - 0.6, (hw + 0.6) * 2.0, (hh + 0.6) * 2.0, p.edge)
+    rect(sx - hw + 0.2, sy - hh + 0.2, (hw - 0.2) * 2.0, (hh - 0.2) * 2.0, p.base)
+    decoSymbol(sx - hw + hh, sy, hh * 0.70, sym, p.ink, p.base)
+    line(sx - hw * 0.05, sy - hh * 0.45, sx + hw - 1.2, sy - hh * 0.45, 1, p.ink)
+    line(sx - hw * 0.05, sy + 0.05, sx + hw - 1.8, sy + 0.05, 1, p.ink)
+    line(sx - hw * 0.05, sy + hh * 0.5, sx + hw - 2.6, sy + hh * 0.5, 1, p.ink)
+  }
+
+  // Engraved symbol: a dark rim with a pale etching inside.
+  etch(sx: f32, sy: f32, s: f32, sym: i32, e: mats.Etching) {
+    decoSymbol(sx, sy, s * 1.22, sym, e.rim, e.rim)
+    decoSymbol(sx, sy, s, sym, e.base, e.rim)
+  }
+
+  // Gilded belt across the glass, edge to edge, with two studs.
+  gild(ox: f32, oy: f32, w: f32, g: mats.Gold) {
+    y0 = oy - 1.2
+    rect(ox - w, y0, w * 2.0, 2.4, g.base)
+    rect(ox - w, y0, w * 2.0, 0.9, g.light)
+    rect(ox - w, y0 + 2.0, w * 2.0, 0.5, g.deep)
+    if (w > 6.0) {
+      poly(g.glint, ox - w + 2.4, oy, ox - w + 3.6, oy - 1.6, ox - w + 4.8, oy, ox - w + 3.6, oy + 1.6)
+      poly(g.glint, ox + w - 2.4, oy, ox + w - 3.6, oy - 1.6, ox + w - 4.8, oy, ox + w - 3.6, oy + 1.6)
+    }
+  }
+
+  // Dotted rune circle around a symbol.
+  runeCircle(sx: f32, sy: f32, s: f32, sym: i32, g: mats.Gold, e: mats.Etching) {
+    r = s + 0.9
+    for i in 0..8 {
+      ang = float(i) * 0.7853982
+      pixel(int(sx + cos(ang) * r), int(sy + sin(ang) * r), g.light)
+    }
+    decoSymbol(sx, sy, s * 0.72, sym, e.base, e.rim)
+  }
+
+  // Gold leaf: a scattering of small gilded flakes inside half-width `w`.
+  speckles(ox: f32, oy: f32, w: f32, g: mats.Gold) {
+    n = 3 to 5
+    for i in 0..n {
+      gx = ox + (-1.0 to 1.0) * max(w - 1.2, 0.5)
+      gy = oy + (-1.0 to 1.0) * 3.3
+      poly(g.light, gx, gy - 1.1, gx + 1.1, gy, gx, gy + 1.1, gx - 1.1, gy)
+    }
+  }
+
+  // Symbols: 0 star, 1 drop, 2 skull, 3 moon, 4 leaf, 5 rune, 6 plus,
+  //          7 heart, 8 bolt, 9 eye, 10 mushroom. `bg` fills the cutouts.
+  decoSymbol(sx: f32, sy: f32, s: f32, sym: i32, c: color, bg: color) {
+    if (sym == 0) {
+      poly(c, sx, sy - s, sx + s * 0.3, sy, sx, sy + s, sx - s * 0.3, sy)
+      poly(c, sx - s, sy, sx, sy - s * 0.3, sx + s, sy, sx, sy + s * 0.3)
+    } else if (sym == 1) {
+      poly(c, sx, sy - s, sx + s * 0.68, sy + s * 0.12, sx - s * 0.68, sy + s * 0.12)
+      oval(sx, sy + s * 0.28, s * 0.68, s * 0.68, c)
+    } else if (sym == 2) {
+      oval(sx, sy - s * 0.2, s * 0.72, s * 0.66, c)
+      rect(sx - s * 0.4, sy + s * 0.25, s * 0.8, s * 0.5, c)
+      pixel(int(sx - s * 0.32), int(sy - s * 0.3), bg)
+      pixel(int(sx + s * 0.32), int(sy - s * 0.3), bg)
+      line(sx, sy - s * 0.05, sx, sy + s * 0.15, 1, bg)
+    } else if (sym == 3) {
+      oval(sx, sy, s * 0.85, s * 0.85, c)
+      oval(sx + s * 0.38, sy - s * 0.18, s * 0.68, s * 0.68, bg)
+    } else if (sym == 4) {
+      poly(c, sx, sy - s, sx + s * 0.62, sy, sx, sy + s, sx - s * 0.62, sy)
+      line(sx, sy + s * 0.7, sx + s * 0.3, sy + s * 1.25, 1, c)
+    } else if (sym == 5) {
+      line(sx, sy - s * 0.9, sx, sy + s * 0.9, 1, c)
+      line(sx - s * 0.65, sy - s * 0.15, sx + s * 0.65, sy - s * 0.15, 1, c)
+      oval(sx, sy - s * 0.65, s * 0.3, s * 0.3, c)
+    } else if (sym == 6) {
+      rect(sx - s * 0.3, sy - s, s * 0.6, s * 2.0, c)
+      rect(sx - s, sy - s * 0.3, s * 2.0, s * 0.6, c)
+    } else if (sym == 7) {
+      oval(sx - s * 0.36, sy - s * 0.3, s * 0.5, s * 0.5, c)
+      oval(sx + s * 0.36, sy - s * 0.3, s * 0.5, s * 0.5, c)
+      poly(c, sx - s * 0.86, sy - s * 0.16, sx + s * 0.86, sy - s * 0.16, sx, sy + s * 0.88)
+    } else if (sym == 8) {
+      poly(c, sx + s * 0.15, sy - s, sx - s * 0.5, sy + s * 0.12, sx - s * 0.08, sy + s * 0.12,
+           sx - s * 0.25, sy + s, sx + s * 0.5, sy - s * 0.15, sx + s * 0.05, sy - s * 0.15)
+    } else if (sym == 9) {
+      oval(sx, sy, s * 0.95, s * 0.62, c)
+      oval(sx, sy, s * 0.45, s * 0.45, bg)
+      pixel(int(sx - s * 0.12), int(sy - s * 0.12), c)
+    } else {
+      oval(sx, sy - s * 0.25, s * 0.8, s * 0.62, c)
+      rect(sx - s * 0.28, sy + s * 0.1, s * 0.56, s * 0.75, c)
+      pixel(int(sx - s * 0.35), int(sy - s * 0.35), bg)
+      pixel(int(sx + s * 0.25), int(sy - s * 0.45), bg)
+    }
+  }
+
+  // A non-negative remainder, for choosing among m options by a hash.
+  md(x: i32, m: i32) -> i32 { return ((x % m) + m) % m }
+}
