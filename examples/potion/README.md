@@ -30,6 +30,13 @@ hue). The parts receive colours and build the materials they need from the share
 The vessel fits the decoration inside the glass and the seal against the shoulder, and reports both
 through its outputs (`label`, `labelfit`, `charm`); the root reads them right after the call.
 
+**Crackled glass (0.9).** About one potion in seven has old, crackled glass: 6% of plain ones, 12%
+of ornate ones and 22% of arcane flasks. The fissures are the seams between warped Worley cells, one
+`noise.mask` (`noise.mode_cell_edge` below a small threshold, crisp), painted pale at one alpha
+inside the vessel's interior mask and under the decoration. Whether a potion is crackled is a
+hashed roll with a key of its own (`crackleKey`) and the mask takes its own explicit seed
+(`fissureKey`), so every other potion keeps the pixels it had.
+
 ## Inputs
 
 | Input | Values |
@@ -58,6 +65,8 @@ node scripts/sheet.mjs examples/potion/potion.ips --sweep style=1,2,3 --seeds 1-
 node scripts/sheet.mjs examples/potion/potion.ips --sweep fill=1,3,5 --seeds 1-8 --outputs
 ```
 
-Fuel stays near 370,000 on average and under 520,000 over seeds 1-200. The vessel fills its body
-pixel by pixel from a signed distance, because every pixel's tone depends on where it sits in the
-glass; everything else is drawn as rows, lines and shapes.
+With Infinite Props 0.9, fuel stays near 335,000 on average and under 530,000 over seeds 1-200 (the
+crackle's noise mask over the 64x64 canvas adds about 52,000 where it appears; 0.8's older tariff
+gave about 370,000 and 520,000). The
+vessel fills its body pixel by pixel from a signed distance, because every pixel's tone depends on
+where it sits in the glass; everything else is drawn as rows, lines and shapes.

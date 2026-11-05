@@ -68,6 +68,10 @@ asset Potion {
   const i32 neckKey = 0xc2b2ae35
   const i32 corkKey = 0x9e3779b9
   const i32 sealKey = 0x42d3a765
+  // Crackle: whether the glass is crackled, and the explicit seed of its
+  // fissure pattern (a noise mask draws from no stream).
+  const i32 crackleKey = 0x1b873593
+  const i32 fissureKey = 0xcc9e2d51
 
   draw {
     start = seed
@@ -319,6 +323,12 @@ asset Potion {
     etching = mats.Etching()
     stream_pop()
 
+    // ---- crackle: an old glass's fine fissures, rare; most on arcane ---
+    // flasks. A hashed roll of its own, so it moves no other draw.
+    crackleOdds = 0.06
+    if (look == 0) { crackleOdds = 0.12 } else if (look == 2) { crackleOdds = 0.22 }
+    crackled = roll(hash(start ^ crackleKey), 0.0, 1.0) < crackleOdds
+
     // ---- short neck seals ---------------------------------------------
     // Keep the fastening close to the collar, resting against the shoulder.
     trinket = 0
@@ -350,6 +360,14 @@ asset Potion {
     symS = symS * min(labelFit.x, 1.0)
     if (labelFit.x < 0.6) { bare = 1 }
     clip(vessel.outputs.interior) {
+    // Crackle: the edges between warped Worley cells, one pixel wide, as
+    // pale fissures over glass and liquid, under the decoration.
+    if (crackled) {
+      fissures = noise.mask({0, 0}, {64, 64}, noise.mode_cell_edge, {0.14, 0.14}, 0.08,
+                            hash(start ^ fissureKey), octaves = 1, softness = 0.0,
+                            comparison = noise.below, warp_amount = 0.3)
+      surface.paint(fissures, color.set.a(#eef8ff, 100), blend = surface.source_over)
+    }
     if (bare == 0) {
       if (decoKind == 0) { sticker(labelAt.x, labelAt.y, symS, sym, paper) }
       else if (decoKind == 1) { tag(labelAt.x, labelAt.y, symS, sym, paper) }

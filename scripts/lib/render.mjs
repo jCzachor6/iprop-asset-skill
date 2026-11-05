@@ -3,6 +3,7 @@ import { spawnSync } from "node:child_process"
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs"
 import { dirname, join, posix, relative, resolve, sep } from "node:path"
 import { decodePng } from "./png.mjs"
+import { versionAtLeast } from "./sdk.mjs"
 
 const IMPORT = /^\s*import\s+(\w+)\s+from\s+"([^"]+)"/gm
 const MATERIAL = /^\s*material\s+[A-Za-z_]\w*\s*\{/m
@@ -126,15 +127,24 @@ export const validate = (sdk, binary) => {
 // ipgen takes a negative i32 as its unsigned 32-bit pattern.
 const uniformValue = (value) => (/^-\d+$/.test(value) ? String((Number(value) + 2 ** 32) >>> 0) : String(value))
 
+// ipgen's JSON cannot hold the typed records of `output list part` (0.9): it renders such an asset
+// only with --omit-part-outputs, which keeps the image and the other outputs and which older SDKs
+// do not know. An asset without part outputs renders the same either way.
+const PART_OUTPUTS = /part outputs are unsupported/
+
 /**
  * Renders one seed to `png`. Returns { ok, info, image } where info is ipgen's JSON (seed, size, fuel,
  * inputs, outputs), or { ok: false, error } for a trap or a bad file.
  */
 export const generate = (sdk, binary, seed, png, uniforms = []) => {
   const args = [binary, "--seed", String(seed >>> 0)]
+  if (versionAtLeast(sdk.version ?? "0", "0.9.0")) args.push("--omit-part-outputs")
   for (const [name, value] of uniforms) args.push("--uniform", `${name}=${uniformValue(value)}`)
   args.push("-o", png)
-  const result = run(sdk.ipgen, args)
+  let result = run(sdk.ipgen, args)
+  if (result.status !== 0 && PART_OUTPUTS.test(result.stderr) && !args.includes("--omit-part-outputs")) {
+    result = run(sdk.ipgen, [args[0], "--omit-part-outputs", ...args.slice(1)])
+  }
   if (result.status !== 0) return { ok: false, error: (result.stderr || result.stdout || String(result.error)).trim().replace(/^ipgen:\s*/, "") }
   const info = JSON.parse(result.stdout)
   const image = decodePng(readFileSync(png))

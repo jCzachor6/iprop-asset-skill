@@ -31,6 +31,15 @@ material Leaves {
   glint = color.mix(light, #e8f0a0, 0.35)
 }
 
+material Moss {
+  // Moss on the bark near the ground: a yellow-green, some cooler.
+  base = #56702c to #869a3a with gaussian(mean = 0.5, sigma = 0.25)
+  // The undersides of its cushions.
+  deep = color.mix(color.scale(base, 0.6), #26302a, 0.3)
+  // Their lit tops, warmer.
+  light = color.mix(color.scale(base, 1.22), #e4e486, 0.12)
+}
+
 material Needles {
   // The middle tone of a tier of needles: a dark spruce green.
   base = #2c4a34 to #46664a with gaussian(mean = 0.5, sigma = 0.25)

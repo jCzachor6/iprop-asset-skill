@@ -1,0 +1,9 @@
+schema_version: "1.1"
+name: dungeon-wall-debris
+expected_outcome: |
+  A wall/ folder holds an Infinite Props asset (wall.ips plus any parts and material library) that
+  compiles with Infinite Props 0.9.0 and renders seeds 1-200 without traps, both intact and broken.
+  The stones are irregular pieces of a Voronoi diagram with gaps of mortar between them (regions,
+  not a hand-placed grid or a pixel loop), moss grows in some seeds from a noise mask, and the pixel
+  art stays crisp. An input that defaults to the intact wall switches to a broken one whose rubble
+  pieces are assigned to an `output list part` slot for the game, and wall/wall.iprop is compiled.

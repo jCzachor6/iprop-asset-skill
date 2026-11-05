@@ -7,8 +7,9 @@ import { existsSync, mkdirSync, readFileSync, rmSync } from "node:fs"
 import { homedir } from "node:os"
 import { join, resolve } from "node:path"
 
-// The release the skill is written for. Materials need it; older releases still compile older sources.
-export const DEFAULT_VERSION = "0.8.0"
+// The release the skill is written for. Noise masks, geometry and dynamic parts need it (materials
+// need 0.8); older releases still compile older sources.
+export const DEFAULT_VERSION = "0.9.0"
 const RELEASES = "https://github.com/jCzachor6/infinite-props/releases/download"
 
 export const platform = () => {

@@ -20,8 +20,9 @@
 //          style in another hue), 8 gradient, 9 duo, 10 nebula, 11 opal,
 //          12 flame, 13 frost, 14 prism. A tint keeps the natural scheme.
 //   motif  0 rolls an abstract motif; 1 none, 2 ripples, 3 marble, 4 filigree,
-//          5 stardust, 6 orbs, 7 sunburst, 8 shimmer, 9 pearls (marble and
-//          shimmer are drawn as ripples and sunburst here)
+//          5 stardust, 6 orbs, 7 sunburst, 8 shimmer, 9 pearls (here marble
+//          is drawn from two noise masks and shimmer as a sunburst; the wing
+//          programs paint both pixel by pixel)
 // Outputs:
 //   anchor    the thorax, where the wings meet the body
 //   collider  the bounds of the wings, body and antennae

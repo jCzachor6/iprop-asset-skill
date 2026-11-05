@@ -46,6 +46,8 @@ asset Tree {
   const i32 shapeKey = 0x51ed2701
   const i32 colorKey = 0x6c656166   // "leaf" in ASCII
   const i32 kinkKey = 0x6b696e6b    // "kink": the trunk's bends, from the shape's seed
+  const i32 mossKey = 0x6d6f7373    // "moss": whether it grows, how high, how thick, its colour
+  const i32 mossFieldKey = 0x9e3779b9  // the explicit seed of the moss's noise mask
 
   // The passes, in painting order.
   const i32 WOOD_DARK = 0
@@ -96,17 +98,44 @@ asset Tree {
     if (season == 7) { leaves = wood.Leaves(light = petal, glint = color.mix(petal, #ffffff, 0.6)) }
     if (leaf.a > 0) { leaves = wood.Leaves(base = color.set.a(leaf, 255)) }
 
+    // Moss on the lower trunk and roots of some trees, in a stream of its
+    // own; its noise mask takes an explicit seed and draws from no stream.
+    stream_push(hash(seed ^ mossKey))
+    mossy = chance(0.3)
+    mossReach = lerp(16.0, 44.0, 0.0 to 1.0 with typical)
+    mossCover = 0.0 to 1.0 with typical
+    moss = wood.Moss()
+    stream_pop()
+
     // The ground cuts the trunk and its roots off flat, along the outline's
-    // dark edge.
+    // dark edge. The wood is captured once, so the moss can follow its mask.
     layer ground(alpha = surface.legacy) { rect(0, 0, 128, 124, #ffffff) }
     soil = mask.from(ground)
-    clip(soil) { grow(WOOD_DARK, look, shape, bark, leaves) }
-    clip(mask.offset(soil, 0, -1)) {
-      grow(WOOD_BODY, look, shape, bark, leaves)
-      grow(WOOD_LIGHT, look, shape, bark, leaves)
+    layer timber {
+      clip(soil) { grow(WOOD_DARK, look, shape, bark, leaves) }
+      clip(mask.offset(soil, 0, -1)) {
+        grow(WOOD_BODY, look, shape, bark, leaves)
+        grow(WOOD_LIGHT, look, shape, bark, leaves)
+      }
     }
+    surface.paint(timber)
+    if (mossy) { mossOn(mask.from(timber), mossReach, mossCover, hash(seed ^ mossFieldKey), moss) }
     grow(LEAVES, look, shape, bark, leaves)
     grow(SPRIGS, look, shape, bark, leaves)
+  }
+
+  // Moss: cushions of warped noise on the wood up to `reach` pixels above the
+  // ground, thicker low down, inside the wood's dark outline, lit along their
+  // tops and shaded below. One noise mask per band instead of a pixel loop.
+  mossOn(timber: mask, reach: f32, cover: f32, field: i32, m: wood.Moss) {
+    low = noise.mask({0.0, 124.0 - reach * 0.45}, {128.0, reach * 0.45}, noise.mode_fbm, {0.12, 0.16},
+                     0.1 - cover * 0.25, field, octaves = 3, softness = 0.0, comparison = noise.above, warp_amount = 0.5)
+    high = noise.mask({0.0, 124.0 - reach}, {128.0, reach * 0.55}, noise.mode_fbm, {0.12, 0.16},
+                      0.25 - cover * 0.2, field, octaves = 3, softness = 0.0, comparison = noise.above, warp_amount = 0.5)
+    mask growth = mask.intersect(mask.union(low, high), mask.shrink(timber, 1))
+    surface.paint(growth, m.base)
+    surface.paint(mask.subtract(growth, mask.offset(growth, 0, 1)), m.light)
+    surface.paint(mask.subtract(growth, mask.offset(growth, -1, -1)), m.deep)
   }
 
   // One walk over the whole tree, painting the tone of `mode`.

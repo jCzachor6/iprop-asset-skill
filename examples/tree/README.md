@@ -7,12 +7,12 @@ separate assets share the folder and its materials:
 - `tree.ips` — a broadleaf tree: a dark trunk of bark strands twisting round
   it, flared into roots at the ground, limbs that wander up and out and thin
   to one-pixel zigzag twigs with a few leaves at their tips, and dense
-  clumps of small leaves lit from the upper left.
+  clumps of small leaves lit from the upper left; on some, moss.
 - `spruce.ips` — a spruce: the same trunk, mostly hidden under tiers of
   needles that hang from it and droop to their tips, lit along their tops
   and dark underneath, with a thin leader at the top and, on some, cones.
 - `materials.ips` — the material file both import: `Bark`, `Leaves`,
-  `Needles` and `Cone`.
+  `Moss`, `Needles` and `Cone`.
 
 A seed alone grows a different tree every time.
 
@@ -70,6 +70,17 @@ across and the dark gaps between them; leaves take their tone from the
 light on the puff, gaps stay in shade, and only leaves stick out past its
 outline.
 
+Three trees in ten carry moss (0.9) on the lower trunk and roots, up to
+16-44 pixels above the ground and thicker near it. The three wood passes
+are captured in a default layer, which paints exactly what they painted
+before, and its mask keeps the moss on the wood, inside its dark outline.
+The cushions are two bands of warped fbm `noise.mask`, the lower one
+denser; offsets of their own mask light their tops and shade their
+undersides in the three tones of `Moss`. Whether a tree is mossy, how high
+and how thick the moss grows and its colour roll in a stream of their own,
+and the mask takes its own explicit seed, so the trees without moss kept
+every pixel.
+
 ## Spruce
 
 | `kind` | Silhouette |
@@ -105,7 +116,8 @@ needles. The branch wood under each tier shows where the needles hang thin.
 
 ## Building
 
-The trees use materials, so they need Infinite Props 0.8.0 or newer. From the skill folder:
+The trees use materials and the broadleaf's moss a noise mask, so they need Infinite Props 0.9.0
+or newer. From the skill folder:
 
 ```sh
 node scripts/check-asset.mjs examples/tree
@@ -113,8 +125,9 @@ node scripts/sheet.mjs examples/tree/tree.ips --seeds 1-25
 node scripts/sheet.mjs examples/tree/spruce.ips --sweep kind=1,2,3 --seeds 1-8
 ```
 
-Fuel stays under 4,000,000. Over seeds 0-1999 the heaviest broadleaf tree
-takes 3,674,631 (seed 803), the 99th percentile about 2.9 million and the
-median about 1.25 million; over seeds 0-299 the heaviest spruce takes
-625,803 (seed 118) and the median about 400,000. No tree or spruce among
-the first 300 seeds reaches the left, right or top edge of the canvas.
+Fuel stays under 4,000,000. With Infinite Props 0.9, over seeds 0-1999 the
+heaviest broadleaf tree takes 3,672,699 (seed 803), the 99th percentile
+about 3.0 million and the median about 1.3 million; over seeds 0-299 the
+heaviest spruce takes 616,658 (seed 118) and the median about 390,000. No
+tree or spruce among the first 300 seeds reaches the left, right or top
+edge of the canvas.

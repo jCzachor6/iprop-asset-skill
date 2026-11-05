@@ -63,6 +63,16 @@ test("every model asset compiles with the SDK", options, () => {
   assert.deepEqual(checkSource(sdk, join(skill, "examples", "potion", "materials.ips")), [])
 })
 
+test("an asset with a list of dynamic parts renders and names it", options, () => {
+  // The shattered shield assigns its shards to `output list part shards`, which ipgen's JSON
+  // cannot hold: the check must render it anyway and say the list is not checked.
+  const { status, report } = check(join(skill, "examples", "shield"), ["--uniform", "damage=2"])
+  assert.equal(status, 0, report.log.join("\n"))
+  assert.deepEqual(warnings(report), [], report.log.join("\n"))
+  const outputs = report.entries[0].checks.find((item) => item.label === "outputs").text
+  assert.match(outputs, /anchor, grip, collider set and on the canvas; shards \(lists of dynamic parts\)/)
+})
+
 test("the lint fixtures raise the check they show", options, () => {
   const expected = { noisy: "noise", dithered: "dither", spiky: "spurs", flat: "outline", soft: "alpha", backlit: "light", tiny: "canvas" }
   for (const [fixture, code] of Object.entries(expected)) {

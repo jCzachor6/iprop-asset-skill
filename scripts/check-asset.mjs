@@ -69,6 +69,13 @@ for (const library of sources.unusedLibraries) report.checks.push(result("warn",
 if (sources.libraries.length && !versionAtLeast(sdk.version, "0.8.0")) {
   report.checks.push(result("error", "materials", `material libraries need Infinite Props 0.8.0 or newer; this SDK is ${sdk.version}`))
 }
+// An older compiler reports the 0.9 builtins as unknown names, which reads like a typo to fix.
+// Only names a 0.8 asset cannot use for its own helpers or imports.
+const NEWER = /\b(?:noise\.mask|voronoi|regions\.(?:gap|bevel|mask|count|id|area|center|neighbors|points)|parts\.(?:from_regions|count|get)|part\.(?:create|fill|texture|place))\s*\(|\boutput\s+list\s+part\b/
+const newer = sources.files.filter((file) => NEWER.test(file.content.replace(/\/\/.*$/gm, "")))
+if (newer.length && !versionAtLeast(sdk.version, "0.9.0")) {
+  report.checks.push(result("error", "version", `${names(newer)} ${newer.length === 1 ? "uses" : "use"} noise masks, geometry or dynamic parts, which need Infinite Props 0.9.0 or newer; this SDK is ${sdk.version}`))
+}
 if (!sources.entries.length) report.checks.push(result("error", "entry", "no asset entry: every .ips here is imported by another file or is a material library"))
 
 // Compile checks: each entry with everything it imports, plus libraries no entry reaches.
@@ -139,6 +146,8 @@ function checkEntry(entry) {
     const fuel = []
     // Outputs the entry declares itself. Part outputs reach the host too, but they belong to the part.
     const own = new Set([...entry.content.matchAll(/\boutput\s+(?:list\s+)?(?:point|rect|circle)\s+([A-Za-z_]\w*)/g)].map((match) => match[1]))
+    // Lists of dynamic parts reach typed hosts only; ipgen renders without them.
+    const partLists = [...entry.content.matchAll(/\boutput\s+list\s+part\s+([A-Za-z_]\w*)/g)].map((match) => match[1])
     const origin = entry.content.match(/^\s*origin\s+(-?[\d.]+)\s*[, ]\s*(-?[\d.]+)/m)
     let info = null
     for (let seed = 1; seed <= scanCount; seed++) {
@@ -160,7 +169,8 @@ function checkEntry(entry) {
 
     const canvas = info ? `${info.size.x}x${info.size.y}` : "?"
     const inputs = info?.inputs.map((input) => `${input.name}:${input.type}=${input.default}`).join(" ") || "none"
-    const outputNames = info?.outputs.filter((output) => own.has(output.name)).map((output) => output.name + (output.list ? "[]" : "")).join(", ") || "none"
+    const ownNames = info?.outputs.filter((output) => own.has(output.name)).map((output) => output.name + (output.list ? "[]" : "")) ?? []
+    const outputNames = [...ownNames, ...partLists.map((name) => `${name}[part]`)].join(", ") || "none"
     say(`${entry.path} · ${canvas} · inputs ${inputs} · outputs ${outputNames}`)
     summary.canvas = info?.size
     summary.inputs = info?.inputs
@@ -210,9 +220,10 @@ function checkEntry(entry) {
       ...[...unset].map(([name, seeds]) => `${name} unset on ${seeds.length} seeds (${seeds.slice(0, 6).join(" ")})`),
       ...[...outside].map(([name, seeds]) => `${name} off the canvas on ${seeds.length} seeds (${seeds.slice(0, 6).join(" ")})`),
     ]
-    if (outputIssues.length) add("warn", "outputs", outputIssues.join("; "))
-    else if (own.size && !broken.length) add("ok", "outputs", `${outputNames} set and on the canvas`)
-    else if (info && !own.size) add("ok", "outputs", "none declared: the game reads only the image")
+    const partNote = partLists.length ? `; ${partLists.join(", ")} (lists of dynamic parts) reach typed hosts only and are not checked here` : ""
+    if (outputIssues.length) add("warn", "outputs", outputIssues.join("; ") + partNote)
+    else if (own.size && !broken.length) add("ok", "outputs", `${ownNames.join(", ")} set and on the canvas${partNote}`)
+    else if (info && !own.size) add("ok", "outputs", partLists.length ? `none checked${partNote}` : "none declared: the game reads only the image")
 
     if (touching.length && !args.includes("--allow-edge")) {
       const sides = [...new Set(touching.flatMap((item) => item.sides))].join(", ")

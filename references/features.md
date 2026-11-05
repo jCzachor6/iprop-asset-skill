@@ -56,6 +56,15 @@ import hilt from "hilt.ips"
 - Parts may import parts (the SDK's `colony/`: colony, mushroom, then cap and stem), up to 256
   instances in all.
 
+**Dynamic parts are not features.** A part file draws a feature you designed; a dynamic part
+(0.9, `part2d`) is a piece cut at run time, from a region, a mask or a layer, when many similar
+pieces each need their own placement, appearance or a record for the game: the stones of a wall,
+the tiles of a floor, the shards of the shield (`damage = 2`). The shield cuts its own drawn
+image along Voronoi cracks, moves each shard a pixel away from the hit and assigns it to
+`output list part shards`, so the game can spawn the same pieces as debris. Placement is a quarter
+turn or a mirror and a rounded translation; keep rotations off lit pixel art, whose light would
+turn with it.
+
 ## 3. Axes of variation
 
 Give every feature a few independent axes and decide how each is rolled:
@@ -67,7 +76,12 @@ Give every feature a few independent axes and decide how each is rolled:
 - **Proportions**: one shared description, `const distribution typical = gaussian(mean = 0.5,
   sigma = 0.18)`, used as `lerp(lo, hi, 0.0 to 1.0 with typical)` for every size of the object.
 - **Details**: `chance(p)` for optional pieces, `2 to 4` for counts, `pick(...)` among a few values.
-- **Wear**: in layers: rub patches off with a mask, then add grit to what is left.
+- **Wear**: in layers: rub patches off with a mask, then add grit to what is left. A `noise.mask`
+  gives clustered patches, seams or veins in one call: the tree's moss, the potion's crackled
+  glass.
+- **States**: what the game changes during play (damage, a lit lantern, an opened chest) is an
+  input that defaults to the plain state, not a roll; the shield's `damage` draws its hit from a
+  stream of its own, so an intact shield stays exactly as it was.
 
 How many families, colours and details each feature gets follows the variety level the user chose
 (`references/variety.md`): build the base at low, polish it, then add axes up to the level.
@@ -170,6 +184,10 @@ Because each concern rolls in its own stream and every roll is made unconditiona
   weights remaps some seeds, so add new families at the end with small weights);
 - **a new colour family or material** is a palette entry or a material; shapes stay put;
 - **a new feature** is a new part file, a new key and one call; nothing else moves;
+- **a new texture or piece of geometry** (`noise.mask`, `voronoi`, `regions.gap`) takes its seed
+  explicitly and draws from no stream: give it a key of its own (`hash(start ^ mossFieldKey)`) and
+  roll whether it appears in a stream of its own, and the other seeds stay pixel for pixel (the
+  tree's moss and the potion's crackle were added this way);
 - **forcing an input** never shifts the rolls that follow it.
 
 Keep the numbers of families, styles and finishes stable once a game uses them: a save file stores
@@ -180,9 +198,16 @@ the seed and the inputs, not the picture. After a restructuring, run
 
 Every instruction spends fuel from 5,000,000 per generation; parts spend from the same budget.
 Paint rows, not pixels; draw a texture once as a layer or a mask and reuse it (the butterfly tiles
-its scale mask with `mask.offset`); when one feature needs a whole budget for detail, make it a
-program of its own that the game composes (the butterfly's `forewing.ips` and `hindwing.ips`). The
-check reports the heaviest seeds; look at them, they are usually the most complex looks.
+its scale mask with `mask.offset`), or make it one `noise.mask` (the butterfly's single program
+draws its marble so, where a pixel loop needs a whole budget); when one feature needs a whole
+budget for detail, make it a program of its own that the game composes (the butterfly's
+`forewing.ips` and `hindwing.ips`). The check reports the heaviest seeds; look at them, they are
+usually the most complex looks.
+
+0.9 charges less for masks, layers, blur and painting than 0.8 did: the same butterfly spends
+about a quarter less, the shield about half. Compare fuel only within one release. Hosts also
+stop a generation at a separate limit of 100,000,000 work units, and may add a deadline; the fuel
+budget is what an asset can plan for.
 
 ## 7. Write it down
 

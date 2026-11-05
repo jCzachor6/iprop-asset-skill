@@ -1,25 +1,30 @@
 # The model assets
 
 Five finished assets ship in `examples/`. Read the one closest to your task: its README first, then
-the root, then one part. Four are pixel art; the butterfly aims at realism. All compile with 0.8.0
+the root, then one part. Four are pixel art; the butterfly aims at realism. All compile with 0.9.0
 and pass `check-asset` (the sword with `--lint-off alpha` for its soft enchanted aura, the butterfly
 with `--style realistic`, its wing programs also with `--allow-edge`). Every file names its stream
 keys (`const i32 shapeKey = 0x51ed2701`) next to its other constants, and every root states its
 variety level: the tree, the potion and the butterfly are extreme, the spruce, the sword and the
 shield high.
 
+Four of them use the 0.9 features, each added without moving the seeds that do not show it: the
+tree's moss and the potion's crackled glass are noise masks, the butterfly's single program draws
+its marble from noise masks instead of a pixel loop, and the shield cracks and shatters along a
+Voronoi diagram into dynamic parts it hands to the game.
+
 | Model | Canvas | Shows best |
 | --- | --- | --- |
-| `tree/` | 128x128 | materials shared by two assets, weighted families, multi-pass drawing, clipping to the ground |
+| `tree/` | 128x128 | materials shared by two assets, weighted families, multi-pass drawing, clipping to the ground; moss from a noise mask on the captured wood |
 | `sword/` | 96x96 | one part per feature in two qualities, weighted quality tiers, a separate emission pass, mount points |
-| `potion/` | 64x64 | parts that report where decorations fit, a clipping mask exported by a part, a material library used by every part |
-| `butterfly/` | 256x256 | realism: symmetry from one mirrored part, data between parts through outputs, textures as masks, splitting for budget |
-| `shield/` | 48x48 | this skill's workflow end to end: features as parts, masks exported for clipping, one part drawn in several passes, outputs taken from a part |
+| `potion/` | 64x64 | parts that report where decorations fit, a clipping mask exported by a part, a material library used by every part; a rare crackle from a cell-edge noise mask |
+| `butterfly/` | 256x256 | realism: symmetry from one mirrored part, data between parts through outputs, textures as masks, splitting for budget; marble veins from ridge noise masks |
+| `shield/` | 48x48 | this skill's workflow end to end: features as parts, masks exported for clipping, one part drawn in several passes, outputs taken from a part; a damage state from Voronoi regions, contours and dynamic parts exported to the game |
 
 ## tree: materials, families, passes
 
 Files: `tree.ips` (broadleaf), `spruce.ips` (conifer) and `materials.ips` (`Bark`, `Leaves`,
-`Needles`, `Cone`), which both trees import as `wood`.
+`Moss`, `Needles`, `Cone`), which both trees import as `wood`.
 
 - **Materials**: every tone of `Bark` and `Leaves` derives from the rolled `base`, so a grey bark or
   an autumn crown keeps the shading of the default ones. The root picks a season with
@@ -37,7 +42,12 @@ Files: `tree.ips` (broadleaf), `spruce.ips` (conifer) and `materials.ips` (`Bark
   numbers, and per-silhouette parameter lists.
 - **Outputs**: `anchor` (the foot of the trunk), `collider` (the trunk's base) and
   `output list circle crown` (one circle per leaf clump) for a game's foliage or shade.
-- Peak fuel about 3.7 million over seeds 0-1999, the most of the three pixel-art models; look at
+- **A texture added later (0.9)**: three trees in ten grow moss on the lower trunk and roots. The
+  wood passes are captured in a default layer (the same pixels as before) whose mask keeps the
+  moss on the wood; two bands of a warped fbm `noise.mask`, denser near the ground, give the
+  cushions; offsets of their own mask light their tops. The moss rolls in a stream of its own and
+  its mask takes an explicit seed, so the other seven trees in ten keep every pixel.
+- Peak fuel about 3.7 million over seeds 0-1999, the most of the pixel-art models; look at
   the heaviest seeds the check names.
 
 ## sword: features in two qualities, tiers, emission
@@ -63,7 +73,9 @@ Files: `sword.ips` (root), `blade.ips` + `hilt.ips` (soldier and ornate swords),
 - **Mount points**: `tip` and `grip` let a game put the sword in a hand and trail effects from its
   point; they stay stable across enchantments and materials.
 - The blades are painted pixel by pixel in the blade's own frame (along and across the blade),
-  because the shading follows the diagonal blade; the cost stays near 0.5 million.
+  because the shading follows the diagonal blade; the cost stays near 0.5 million. For the same
+  reason the sword uses no 0.9 texture: a noise mask is laid out along the canvas axes, so its
+  lines cannot follow a blade at 45 degrees, and on a blade five pixels wide they read as dirt.
 
 ## potion: fitting features to each other
 
@@ -91,6 +103,10 @@ Files: `potion.ips` (root), `vessel.ips`, `neck.ips`, `cork.ips`, `seal.ips`, `m
   stopper).
 - The whole composition is captured in a `layer potionImage(alpha = surface.source_over)` and
   painted with `blend = surface.source_over`, so translucent glass and shadows survive.
+- **A rare finish (0.9)**: about one potion in seven (one arcane flask in five) has crackled glass,
+  the seams of a warped cell-edge `noise.mask` painted pale, at one alpha, inside
+  `vessel.outputs.interior` and under the decoration. Whether it appears is a hashed `roll` with a
+  key of its own, so every other potion keeps its pixels.
 
 ## butterfly: the realistic direction
 
@@ -106,6 +122,9 @@ program of its own). Its README describes the structure. What to take from it:
 - orthogonal, weighted axes (`style`, `scheme`, `motif`), each forced alone;
 - a texture drawn once as a mask and tiled with `mask.offset`;
 - splitting a feature into its own program when it needs a whole fuel budget;
+- a cheaper relative instead (0.9): the marble motif is a per-pixel loop that needs a wing
+  program's budget, so the single program used to draw ripples in its place; it now paints marble
+  veins from two ridge `noise.mask`es with soft edges (`marbleVeins`) for a fraction of the fuel;
 - soft painting: captured layers, `.blur(sigma)`, translucent shadows painted with source-over.
 
 It predates materials: its colours are gradient palettes indexed by style. Written today, a wing
@@ -131,7 +150,15 @@ prompt: a 48x48 shield for a top-down roguelike, with an anchor, a grip and a co
   brightness with what lies beneath.
 - **Outputs from a part**: the board reports `foot`, `bounds` and `boss`; the root returns them as
   `anchor`, `collider` and `grip`.
-- Peak fuel about 417,000, on a kite whose emblem takes four passes.
+- **A game state with geometry (0.9)**: `damage` 1 cracks the shield and 2 shatters it. The whole
+  shield is drawn into one default layer (an intact shield keeps every pixel), and five Voronoi
+  sites ringing a hit beside the boss make cracks that all run out from it: `regions.gap` opens
+  them, a legacy capture of `regions.mask` keeps them crisp, and the lower lip of each crack is lit.
+  Shattered, the pixels between the cracks are traced back with `contour` (slivers dropped by
+  `min_area`), each traced region becomes a dynamic part textured with the drawn shield, moves a
+  pixel away from the hit and goes to `output list part shards`, so the game can spawn the same
+  shards as debris through its binding's typed results.
+- Peak fuel about 243,000 intact and 313,000 shattered, on a kite whose emblem takes four passes.
 
 ## Examples in the SDK
 
@@ -145,13 +172,19 @@ compiles and runs in the SDK's CI. Good for idioms:
 - `captured-panels.ips`, `blurred-layer.ips`, `soft-mask.ips`, `masked-badge.ips` (layers, masks,
   clip, blur), `resource-exports.ips` with `parts/` (masks and layers exported by parts);
 - `nested-import.ips` and `../colony/` (parts that import parts);
+- 0.9: `noise-mask.ips`, `cheetah-spots.ips`, `giraffe-spots.ips` and `noise-extensions.ips`
+  (noise masks and the new noise functions); `voronoi.ips`, `regions.ips`, `contours.ips`,
+  `gap-bevel.ips`, `wall-bevel.ips`, `stone-wall.ips`, `paving.ips`, `dry-earth.ips` (geometry,
+  gaps and bevels); `dynamic-parts.ips`, `dynamic-tiles.ips`, `part-export.ips` (dynamic parts and
+  their export);
 - `style/*.ips` (programs that break one rule each; the reference shows the fix) and `errors/`,
   `traps/` (what a diagnostic or a trap looks like).
 
-The public site has a compact 0.8 sample of parts and materials: `https://infiniteprops.dev/intro/`
-`tree.ips`, `clump.ips` (a part that takes a colour and builds the material from it, five-tone
-ramp, a shadow from `mask.offset`) and `foliage.ips` (a library with a private palette and a
-weighted family).
+The public site has a compact sample of parts, materials and a noise mask:
+`https://infiniteprops.dev/intro/` `tree.ips` (its crown's rim bulges with smooth noise and a
+0.9 `noise.mask` opens gaps in it), `clump.ips` (a part that takes a colour and builds the material
+from it, five-tone ramp, a shadow from `mask.offset`) and `foliage.ips` (a library with a private
+palette and a weighted family).
 
 Do not copy the style of `examples/recipes/` (written for 0.4) or of the root `pot.ips`,
 `flower.ips`, `portrait.ips`, `plant.ips`, `eyes.ips` and `hair.ips` (older `unit()`/`range()` style).

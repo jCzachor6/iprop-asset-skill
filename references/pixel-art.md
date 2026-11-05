@@ -28,11 +28,22 @@ reads as a comb. Keep one-pixel strands for what really is thin (twigs, antennae
 
 **Texture.** Build texture from small marks in the ramp: one- or two-pixel leaves, chips, grain
 lines, rivets. Per-pixel random colours read as static. Do not dither in checkerboards; use clean
-bands of tones.
+bands of tones. A `noise.mask` with `softness = 0.0` gives clustered marks rather than static:
+cushions of moss (fbm), spots (cell below a threshold), seams and crackle (cell-edge below one),
+veins (ridge above one). Shade a mask's clusters from its own offsets, as for a shape: the pixels
+whose upper neighbour is outside are lit, `mask.subtract(m, mask.offset(m, 0, 1))`, the lower right
+ones shaded. Keep the frequency low enough that the clusters are two pixels or more across.
 
 **Crisp pixels.** Single pixels go to integer positions; turns are 90° only (`rot`, `mirror_x`);
 no anti-aliased edges. Alpha is 0 or 255, except deliberate translucency (glass, a ground shadow)
-in one uniform alpha, painted with source-over.
+in one uniform alpha, painted with source-over. Region masks, `regions.bevel` and the edges of
+dynamic parts are sampled four by four and come out anti-aliased: paint the mask into a default
+(legacy) layer, which keeps only whole pixels, and use that layer's mask (the shield's cracks and
+shards). `regions.bevel` is a soft gradient for the realistic style; in pixel art, light and shade
+the edges of regions from mask offsets.
+
+**Cracks and seams.** A crack is a dark line with a lit lip on its lower right side, where the far
+wall faces the light: `mask.subtract(mask.offset(crack, 1, 1), crack)` in a light tone.
 
 **Wear.** In layers: rub patches off with a mask, then add grit or rust in clusters to what is
 left. Restrained: most seeds a little, a few a lot (`beta` leaning low).

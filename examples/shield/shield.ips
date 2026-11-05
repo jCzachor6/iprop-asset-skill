@@ -30,11 +30,21 @@
 //           12 lozenge, 13 chief, 14 pale
 //   paint   transparent rolls the paint; any other colour paints the field,
 //           or the emblem on a bare face (team colours)
+//   damage  0 intact; 1 cracked: cracks run out from a hit beside the boss;
+//           2 shattered: the same cracks split it and the pieces part
 // Outputs, in canvas pixels (y down):
 //   anchor    the foot of the shield on its centre line: where it rests on
 //             the ground (dropped shields, y-sorting)
 //   grip      where the hand holds it, behind the boss: attach it to the hand
 //   collider  the shield's bounds, rim and outline included
+//   shards    a shattered shield's pieces as dynamic parts: each one's shape,
+//             its pixels and where it lies, for the game's debris (typed host
+//             APIs only; empty unless damage is 2)
+//
+// The damage (0.9): a Voronoi diagram around the hit gives the pieces,
+// regions.gap the cracks between them, and each piece is a dynamic part
+// textured with the drawn shield. An intact shield renders exactly as it did
+// before the damage existed.
 //
 // Variety: high
 
@@ -50,9 +60,11 @@ asset Shield {
   input u32 body = 0                // 0 rolls; 1 wooden, 2 metal
   input u32 emblem = 0              // 0 rolls; 1 none, 2..14 a design (see above)
   input color paint = #00000000     // transparent rolls the paint; a colour sets it
+  input u32 damage = 0              // 0 intact; 1 cracked; 2 shattered
   output point anchor
   output point grip
   output rect collider
+  output list part shards           // a shattered shield's pieces, for the game's debris
 
   // Proportions cluster around the typical shield; extremes stay rare.
   const distribution typical = gaussian(mean = 0.5, sigma = 0.2)
@@ -78,6 +90,10 @@ asset Shield {
   const i32 boardKey = 0x85ebca6b
   const i32 emblemKey = 0x27d4eb2f
   const i32 bossKey = 0xc2b2ae35
+  // The damage: where the hit lands and how its cracks run, and the seed of
+  // the cracks' varying width (an explicit seed: it draws from no stream).
+  const i32 impactKey = 0x9b05688c
+  const i32 crackKey = 0x1f83d9ab
 
   draw {
     // ---- the shape family: hashed, so a rolled shape renders exactly like
@@ -217,9 +233,10 @@ asset Shield {
     }
     if (paint.a != 0 && painted == 0) { chargeColour = color.set.a(paint, 255) }
 
-    // ---- the parts ----------------------------------------------------------------
+    // ---- the parts, drawn into one image: a damaged shield is cut from it --------
     field = #00000000
     if (painted == 1) { field = fieldColour }
+    layer whole {
     board.draw(hash(seed ^ boardKey), at = {0, 0}, shape = look, half = half, tall = tall,
                bend = bendRoll, body = built, planks = planks, rimKind = rimKind, rimWidth = rimW,
                studs = studs, wood = wood.base, metal = plate.base, rim = rimColour, field = field,
@@ -234,6 +251,7 @@ asset Shield {
     mask litArea = board.outputs.lit
     mask shadeArea = board.outputs.shade
     mask seamArea = board.outputs.seams
+    mask face = board.outputs.face
 
     // The boss keeps to half the face's width at its row (the waist of a
     // waisted shield is narrow); flanges, plates and studs reach further.
@@ -272,6 +290,79 @@ asset Shield {
     mask bossShape = boss.outputs.footprint
     // The boss casts a short shadow on the face, below and to the right.
     surface.paint(mask.subtract(mask.offset(bossShape, 1, 1), bossShape), #10142060)
+    }
+
+    // ---- damage: intact, cracked or shattered ----------------------------------------
+    if (damage == 0) {
+      surface.paint(whole)
+    } else {
+      // The hit lands on the face beside the boss. The cracks are the edges
+      // of a Voronoi diagram whose sites ring the hit, so they all run out
+      // from it. The hit draws from a stream of its own, so the shield above
+      // stays exactly as it was.
+      stream_push(hash(seed ^ impactKey))
+      side = 0.0 to 6.2832
+      out = 0.0 to 1.0 with typical
+      turn = 0.0 to 6.2832
+      bends = [-0.35 to 0.35, -0.35 to 0.35, -0.35 to 0.35, -0.35 to 0.35, -0.35 to 0.35]
+      // Unequal distances, so the cracks meet near the hit, not in one point.
+      rings = [3.0 to 4.4, 3.0 to 4.4, 3.0 to 4.4, 3.0 to 4.4, 3.0 to 4.4]
+      run = lerp(8.0, 15.0, 0.0 to 1.0 with typical)
+      stream_pop()
+      hit = bossAt + heading(side) * lerp(reach + 1.0, max(reach + 1.5, room.x - 2.0), out)
+      spokes = [hit + heading(turn + bends[0]) * rings[0], hit + heading(turn + 1.2566 + bends[1]) * rings[1],
+                hit + heading(turn + 2.5133 + bends[2]) * rings[2], hit + heading(turn + 3.7699 + bends[3]) * rings[3],
+                hit + heading(turn + 5.0265 + bends[4]) * rings[4]]
+      pieces = regions.gap(regions(voronoi({0, 0}, {48, 48}, spokes)), 1.0, 0.6, hash(seed ^ crackKey))
+      // Region masks are anti-aliased; a legacy capture keeps only their
+      // whole pixels, so the cracks stay crisp.
+      layer kept { surface.paint(regions.mask(pieces), #ffffff) }
+      if (damage == 1) {
+        // Cracks: the gaps between the pieces, inside the rim and off the
+        // boss, out to `run` pixels from the hit.
+        layer burst { oval(hit, run, run, #ffffff) }
+        mask crack = mask.intersect(mask.subtract(mask.subtract(face, mask.from(kept)), mask.expand(bossShape, 1)), mask.from(burst))
+        surface.paint(whole)
+        surface.paint(crack, crackDeep(built, wood, plate))
+        // The lower lip of a crack catches the light from the upper left.
+        surface.paint(mask.intersect(mask.subtract(mask.offset(crack, 1, 1), crack), mask.subtract(face, bossShape)), crackLip(built, wood, plate))
+      } else {
+        // Shards: the shield's pixels between the cracks, traced back into
+        // geometry, so each shard's shape is exactly what it shows (a low
+        // threshold keeps every whole pixel inside); slivers under 3 px go.
+        // Each shard shows the shield's own pixels and moves a little away
+        // from the hit. The game gets every shard in `shards`.
+        outlines = contour(mask.intersect(mask.from(whole), mask.from(kept)), 0.1, 0.0, 3.0, contour.four)
+        shardSet = parts.from_regions(regions(outlines))
+        layer debris(alpha = surface.source_over) {
+          for i in 0..parts.count(shardSet) {
+            piece = part.texture(parts.get(shardSet, i), whole)
+            away = part.center(piece) - hit
+            piece = part.place(piece, part.center(piece) + away * (1.0 / max(vec2.len(away), 1.0)), 0, 0, 0)
+            part.draw(piece)
+            shards = piece
+          }
+        }
+        // The traced edges pass half a pixel outside: keep the whole pixels.
+        layer solid { surface.paint(mask.from(debris), #ffffff) }
+        clip(mask.from(solid)) { surface.paint(debris, blend = surface.source_over) }
+      }
+    }
+  }
+
+  // The unit vector at angle a (radians, y down).
+  heading(a: f32) -> vec2 {
+    return {cos(a), sin(a)}
+  }
+
+  // The dark inside of a crack and its lit lip, in the body's own tones.
+  crackDeep(built: i32, w: mats.Wood, m: mats.Metal) -> color {
+    if (built == 2) { return m.edge }
+    return w.edge
+  }
+  crackLip(built: i32, w: mats.Wood, m: mats.Metal) -> color {
+    if (built == 2) { return m.light }
+    return w.light
   }
 
   // Perceived brightness of a colour, 0..255.

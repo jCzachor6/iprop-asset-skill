@@ -1,6 +1,6 @@
 ---
 name: iprop-asset
-description: Create, extend, fix and review Infinite Props assets, the seeded procedural props written as `.ips` recipes (an asset, its parts and material libraries) and compiled to `.iprop` for games. Teaches the language up to 0.8 (materials, steppers, samplers, weighted distributions, layers and masks), splitting a prop into characteristic features that grow new variants and colours, compiling and rendering with the SDK (ipc, ipval, ipgen), checking every seed, linting the pixel art, reviewing contact sheets and using the result in a game engine. Use it whenever someone wants to make, write, generate, port, improve, extend, debug or review an Infinite Props / iprop / .ips asset, a procedural sprite or prop generator, or seeded pixel-art objects for a game (weapons, potions, trees, crates, furniture, creatures and the like), even when they do not name the language. Not for packaging store listings or for changing the compiler itself.
+description: Create, extend, fix and review Infinite Props assets, the seeded procedural props written as `.ips` recipes (an asset, its parts and material libraries) and compiled to `.iprop` for games. Teaches the language up to 0.9 (materials, steppers, samplers, weighted distributions, layers and masks, noise masks, Voronoi regions with gaps and bevels, dynamic parts), splitting a prop into characteristic features that grow new variants and colours, compiling and rendering with the SDK (ipc, ipval, ipgen), checking every seed, linting the pixel art, reviewing contact sheets and using the result in a game engine. Use it whenever someone wants to make, write, generate, port, improve, extend, debug or review an Infinite Props / iprop / .ips asset, a procedural sprite or prop generator, or seeded pixel-art objects for a game (weapons, potions, trees, crates, furniture, creatures and the like), even when they do not name the language. Not for packaging store listings or for changing the compiler itself.
 ---
 
 # Create Infinite Props assets
@@ -12,17 +12,18 @@ input force one aspect without disturbing the rest.
 
 Sources are `.ips` files; `ipc` compiles them into one self-contained `.iprop` that runtimes for
 C, Godot, Unity, the web, Swift, Kotlin and Python generate from. Write in the current language
-(0.8), not in the style of older code you may find.
+(0.9), not in the style of older code you may find.
 
 ## Before writing code
 
-1. **Get the SDK.** `node <skill>/scripts/sdk.mjs` downloads Infinite Props 0.8.0 into a cache
+1. **Get the SDK.** `node <skill>/scripts/sdk.mjs` downloads Infinite Props 0.9.0 into a cache
    (SHA-256 checked, macOS arm64, Linux x64 or Windows x64), or uses `IPROP_SDK` when it points at
    an unpacked SDK. It prints the tools and the path of `LLM_REFERENCE.md` for that exact version,
    with the line where every section starts.
 2. **Read the reference.** Read `LLM_REFERENCE.md` from line 1 to the end of "Compiler rules"
    (about 440 lines): the house style, the before/after pairs and the typing rules. Then read the
-   sections you use as you use them (materials, parts, layers and masks, the builtins you call).
+   sections you use as you use them (materials, parts, layers and masks, geometry, the builtins
+   you call).
    Signatures, argument names and limits come from there; do not guess them.
 3. **Read the method and a model.** `references/features.md` explains how to split a prop into
    features, axes of variation and materials. `references/examples.md` walks through five finished
@@ -113,6 +114,10 @@ README. Never invent outputs the user did not ask for.
 - Helpers see palettes, constants and `seed`, not inputs: pass what they need as typed parameters.
 - Paint rows (`rect` per row), lines, ovals and polygons, not pixel loops: fuel is limited
   (5,000,000 per generation) and a level spends it many times over.
+- A texture (spots, patches, seams, veins, moss) is one `noise.mask`, and pieces (stones, tiles,
+  plates, shards) are a `voronoi` cut into `regions`, never a pixel loop. Both take an explicit seed
+  and draw from no stream: give each a key of its own (`hash(start ^ mossKey)`), so adding one
+  moves no other roll.
 - Pixel art: 4-5 tones per material (`stepper(dark to light).pick(5)`), shadows cooler and lights
   warmer, light from the upper left, a readable edge (outline or rim light), texture from small
   marks in the ramp, no single-pixel noise, no checkerboard dithering, integer coordinates and
@@ -121,7 +126,7 @@ README. Never invent outputs the user did not ask for.
 - Outputs only when the game reads them: `output point anchor`, `output rect collider`, mount
   points, `output list circle` for many. A prop with none is complete.
 
-## Language features to reach for (0.6-0.8)
+## Language features to reach for (0.6-0.9)
 
 | Need | Use | Since |
 | --- | --- | --- |
@@ -133,6 +138,10 @@ README. Never invent outputs the user did not ask for.
 | lists, polygons | `const list<vec2> outline = [{3, 4}, {18, 2}, {25, 15}]`, `poly(outline, c)`, `list.len(items)`, `.distinct()`, `.sort()` | 0.7 |
 | draw once, paint, outline, clip | `layer name(alpha = surface.source_over) { ... }`, `mask.from`, `mask.expand`, `clip(mask) { ... }`, `.blur(sigma)` | 0.7 |
 | one look shared by many files | a material library: `material Bark { base = ...; shadow = color.mix(base, ...) }` | 0.8 |
+| spots, patches, seams, veins, moss | `noise.mask(origin, size, noise.mode_cell, {0.1, 0.1}, 0.3, hash(start ^ spotsKey), octaves = 1, softness = 0.0, comparison = noise.below, warp_amount = 0.3)`: a mask to paint or clip | 0.9 |
+| stones, tiles, plates, cracks | `voronoi(origin, size, 24, hash(start ^ wallKey), voronoi.grid, 0.4, 1)`, `regions.gap(regions(d), 1.5, 0.3, hash(start ^ gapKey))`, `regions.mask(rs, i)`, `regions.bevel(rs, 2, {-1, -1})` | 0.9 |
+| a drawn shape as geometry | `contour(mask, 0.5)`, then `regions(...)` | 0.9 |
+| pieces placed, recoloured or handed to the game one by one | `parts.from_regions(rs)`, `part.fill` or `part.texture`, `part.place(p, at, rot, mirror_x, mirror_y)`, `part.draw(p)`, `output list part pieces` | 0.9 |
 
 ## Things that bite
 
@@ -144,7 +153,8 @@ README. Never invent outputs the user did not ask for.
   disappears. Draw glows, shadows and glass in a `layer name(alpha = surface.source_over)` and
   paint it with `blend = surface.source_over`. Inside a part, translucent paint over its own empty
   canvas vanishes the same way: draw such overlays in the asset that places the part.
-- Read `part.outputs.name` right after the call that set it; it holds the last call's value.
+- Read `part.outputs.name` right after the call that set it: once another part has been drawn,
+  reading it traps (`slot does not belong to the last called part`).
 - Materials live only in a file with no asset; create an instance only by assignment
   (`m = mats.Cork()`, never `mats.Cork().base`); a local holding one material cannot later hold a
   plain colour; parts take colours, not materials, and build their own instance from the colour.
@@ -158,7 +168,23 @@ README. Never invent outputs the user did not ask for.
   find them, which is why the check scans 200 seeds.
 - `ipgen --uniform` takes a negative `i32` as its unsigned pattern (`4294967295` for -1); the skill's
   scripts convert it for you.
-- Builds of 0.7.x cannot compile materials. Use the 0.8.0 SDK from `sdk.mjs`.
+- Region masks, bevels and the edges of dynamic parts are anti-aliased (sampled 4x4). For crisp
+  pixel art, paint them into a default (legacy) layer, which keeps only whole pixels, and use that
+  layer's mask; draw dynamic parts in a source-over layer and clip it to such a mask. `noise.mask`
+  is crisp with `softness = 0.0`.
+- A `noise.mask` threshold is the raw noise value: ridge above about 0.85 gives thin veins,
+  cell-edge below about 0.08 one-pixel seams, fbm above 0 about half the area. Tune it on a sheet.
+- Voronoi sites at one distance from a point meet in one vertex, where `regions.gap` can trap
+  (`region offset has an ambiguous touching boundary`): jitter the distances.
+- `diagram2d`, `regions2d`, `part2d` and the other handles live in `draw` and helpers only: they
+  cannot be consts, inputs, palette or list elements. Do not name an import `part` or `parts`:
+  `part.draw(p)` with one argument is the 0.9 dynamic part.
+- `ipgen` renders an asset with `output list part` only with `--omit-part-outputs` (the scripts add
+  it, and the check lists such outputs without checking them); games read the parts through the
+  typed result API of their binding.
+- Materials need 0.8, noise masks, geometry and dynamic parts 0.9: use the 0.9.0 SDK from
+  `sdk.mjs`. 0.9 counts fuel with a new tariff (masks, layers, blur and paint cost less), so fuel
+  figures measured with 0.8 do not carry over.
 - Leave room for outlines, glows and blur inside the canvas; the check warns when seeds touch the
   edge, except the bottom edge when the origin stands there.
 - `v` and `a` are ordinary names, not built-in controls: declare only the inputs the asset needs and
@@ -170,9 +196,9 @@ README. Never invent outputs the user did not ask for.
   stream keys, growing an asset with new variants and colours.
 - `references/variety.md`: the four variety levels, what each adds, the variety pass and its
   measure.
-- `references/examples.md`: tree, sword, potion, butterfly and shield in `examples/`, and which SDK
-  examples are worth reading.
-- `references/language.md`: reading the reference, the 0.6-0.8 features with snippets, diagnostics,
+- `references/examples.md`: tree, sword, potion, butterfly and shield in `examples/` (four of them
+  use the 0.9 features), and which SDK examples are worth reading.
+- `references/language.md`: reading the reference, the 0.6-0.9 features with snippets, diagnostics,
   traps, and modernising older sources.
 - `references/pixel-art.md`: quality rules for both styles, and the lint codes.
 - `references/review.md`: the review loop and what each check means.

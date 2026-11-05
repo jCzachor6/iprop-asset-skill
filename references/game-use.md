@@ -6,7 +6,10 @@
 `<entry>.iprop` next to each entry; `ipc <entry>.ips -o <path>.iprop` does the same without the
 checks. Each entry becomes one self-contained file: its parts and materials are linked in, and the
 game never loads `.ips` sources. Keep the sources as the truth and recompile when the SDK changes.
-The 0.8 release changed only the source language; its `.iprop` files run on 0.7 runtimes.
+An asset that uses no 0.9 builtin compiles to the same bytes with 0.9 as with 0.8 and runs on 0.8
+runtimes (the five models did, before their 0.9 additions); one that uses noise masks, geometry or
+dynamic parts needs a 0.9 runtime. 0.9 runtimes draw older files with the same pixels and outputs,
+but charge fuel by the new tariff.
 
 ## Runtimes
 
@@ -15,9 +18,9 @@ Each SDK carries a README per runtime under `share/iprop/backends/<name>/`:
 | Runtime | What it is |
 | --- | --- |
 | `capi` | the C API (`ipropc`, shared and static), the base of every native host |
-| `godot` | a GDExtension exposing assets as Godot resources and nodes (Godot 4.5) |
-| `unity` | a UPM package: `.iprop` importer with previews, `IpropAsset`, Texture2D and Sprite helpers |
-| `html5` | the runtime in WebAssembly: `generate(fileBytes, inputs)` returns pixels, outputs and fuel |
+| `godot` | a GDExtension exposing assets as Godot resources and nodes (Godot 4.5.2) |
+| `unity` | a UPM package (Unity 2022.3+): `.iprop` importer with previews, `IpropAsset`, Texture2D and Sprite helpers |
+| `html5` | the runtime in WebAssembly: `generate(fileBytes, inputs)` returns pixels and outputs, parts included |
 | `apple` | a Swift package for macOS and iOS with CGImage, SpriteKit and Metal helpers |
 | `android` | a Kotlin AAR with a Bitmap adapter |
 | `python` | a `ctypes` package over the C API, Pillow optional |
@@ -26,9 +29,17 @@ Each SDK carries a README per runtime under `share/iprop/backends/<name>/`:
 ## What the game passes and gets
 
 - **In**: the seed (u32), any declared inputs by name, optionally a target size (which scales
-  the drawing; `ipgen --size WxH` does the same) and a fuel budget.
+  the drawing; `ipgen --size WxH` does the same) and a fuel budget. Since 0.9 every binding also
+  takes execution limits: a work budget (default 100,000,000 units), an optional deadline and a
+  cancellation token; a generation stopped by them fails as a whole, with no partial image
+  (`docs/execution-limits.md` in the SDK).
 - **Out**: RGBA pixels and the outputs, in the root canvas's pixel coordinates: points, rects
-  (`x, y, w, h`), circles (`x, y, r`) and lists of them.
+  (`x, y, w, h`), circles (`x, y, r`) and lists of them. An `output list part` slot (0.9) holds
+  dynamic parts: each one's shape (geometry with holes, or a raster), its fill or texture, its
+  placement (quarter turns, mirrors, an integer translation), bounds, anchor and IDs, through the
+  typed result API of every binding (in Python, `image.outputs` slots of kind `PART` with a
+  `parts` tuple, and `image.resource(...)` for the shared shapes and textures). `ipgen`'s JSON
+  cannot hold them: it renders such an asset with `--omit-part-outputs`.
 - **Determinism**: the same program, seed and inputs give the same pixels and outputs on every
   platform. Store the seed and the input values in save files and level data, not pictures.
 
@@ -46,6 +57,9 @@ Each SDK carries a README per runtime under `share/iprop/backends/<name>/`:
   same seed for bloom; generate both with identical inputs.
 - **Inputs from game state**: team colours through a tint, a quality tier, a damaged state. Leave
   them at their rolling defaults when the seed alone should decide.
+- **Debris and pieces**: when the shield breaks, generate it again with `damage = 2` and spawn its
+  `shards`: each record carries the shard's shape for a physics body, its texture from the drawn
+  shield and where it lies, so the pieces match the sprite pixel for pixel.
 - **Pre-rendering** for an engine without a runtime: render the seeds you need with
   `ipgen <file.iprop> --seed N -o out.png` (its JSON on stdout carries the outputs) or a strip with
   `ipsheet <file.iprop> --seed 1 --seeds 16 --columns 8 -o atlas.png`, and pack them.

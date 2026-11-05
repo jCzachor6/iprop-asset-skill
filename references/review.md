@@ -12,10 +12,14 @@ An asset is done when many seeds look good, not when it compiles. Review after e
    Each row forces one value. Every row should read as its family; for a colour axis
    (`--sweep tint=#b03a2e,#2e6db0,#d8c040`) a column should keep one silhouette.
 4. Look at the extremes: the heaviest seeds the check names (`--seeds 57,113,9`) and the families
-   that are rare by weight (force them).
+   that are rare by weight (force them). Check every game state the same way: the check renders
+   inputs at their defaults, so run it once per state (`check-asset.mjs <folder> --uniform
+   damage=2`) and sweep them (`--sweep damage=0,1,2`).
 5. Look at the outputs, if the asset has any: `--outputs` draws colliders (magenta), circles (cyan)
    and points (yellow). A collider should wrap the solid part, the anchor sit on the ground, mount
-   points where things attach.
+   points where things attach. Lists of dynamic parts are not drawn: read a few through a typed
+   binding (the SDK's Python package needs only `ctypes`: `Program(path).generate(seed,
+   inputs=...)`, then the slot's `parts`) and check their count, bounds and placement.
 6. Look in context: `--bg light`, `--bg checker`, or the game's background colour (`--bg #2a3a2a`);
    `--real-size` adds the seeds at 1x.
 7. Compare: `sheet-previous.png` keeps the previous run. Keep `seeds.txt` with seeds that once looked
@@ -56,13 +60,14 @@ ones included, must meet the same bar.
 | Check | Means | Usual fix |
 | --- | --- | --- |
 | `compile` | diagnostics of every entry and unused library | the code and message; `references/language.md` |
+| `version`, `materials` | the sources use features the SDK in use cannot compile (0.9 builtins, 0.8 materials) | use the SDK `sdk.mjs` downloads, or set `IPROP_SDK` to a newer one |
 | `ipval` | the compiled binary failed validation | rare; recompile with the same SDK, report it |
 | `traps` | seeds that stop with a run-time error | the trap table in `references/language.md` |
 | `empty` | seeds that draw nothing | a family or branch that never paints; a translucent paint on the legacy root |
 | `variety` | distinct images and silhouettes among the scanned seeds | roll the shape, not only colours; check streams |
 | `level` | the variety level measured over the scan (silhouette groups and colour schemes for 90% of seeds) against the `// Variety:` line or `--variety` | below: add families on the poorer axis; two above: narrow them (`references/variety.md`) |
-| `fuel` | mean, peak and heaviest seeds; warns above 80% of the budget | rows instead of pixels, reuse layers, split features |
-| `outputs` | outputs the entry declares: unset, not finite or off the canvas; none is fine | set every output on every path; check coordinates |
+| `fuel` | mean, peak and heaviest seeds; warns above 80% of the budget | rows instead of pixels, a noise mask instead of a texture loop, reuse layers, split features |
+| `outputs` | outputs the entry declares: unset, not finite or off the canvas; none is fine. Lists of dynamic parts are named but not checked | set every output on every path; check coordinates; read part lists through a typed binding |
 | `edge` | seeds touching the canvas edge (the bottom is fine when the origin stands there) | smaller proportions, a margin, a larger canvas |
 | `determinism` | the same seed renders twice the same | do not depend on anything but the seed and inputs |
 | `input <name>` | an input documented as "0 rolls" or "transparent rolls" | hash the seed for the roll; make every roll unconditionally; roll colours after the shape |

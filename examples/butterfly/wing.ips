@@ -899,8 +899,9 @@ asset ButterflyWing {
       ink = color.mix(accent, rim, 0.3)
     }
     // Per-pixel motifs need a whole program's budget; the single program
-    // draws their cheaper relatives.
-    if (detail == 0 && figure == 3) { figure = 2 }
+    // draws their cheaper relatives: marble from noise masks (10), the
+    // shimmer as a sunburst.
+    if (detail == 0 && figure == 3) { figure = 10 }
     if (detail == 0 && figure == 8) { figure = 7 }
     // The edge takes the wing's own outermost colour, never a drawn outline.
     foreEdge = color.shade(outer, -14)
@@ -1861,6 +1862,7 @@ asset ButterflyWing {
     else if (figure == 7) { sunburst(p, r, gaps, color.set.a(glow, 130), color.set.a(ink, 85)) }
     else if (figure == 8) { shimmer(p, r, len, key, 72) }
     else if (figure == 9) { pearls(p, r, len, m0, m1, 1.8, color.set.a(glow, 80)) }
+    else if (figure == 10) { marbleVeins(p, len, key, color.set.a(glow, 230), color.set.a(ink, 170)) }
   }
 
   // The motif's crisp share, painted over the scales. The single program
@@ -1901,6 +1903,22 @@ asset ButterflyWing {
         else if (v < -0.75) { pixel(x, y, color.set.a(dark, int((-v - 0.75) * 4.0 * float(dark.a)))) }
       }
     }
+  }
+
+  // Marbling for the single program, from two noise masks (0.9) instead of a
+  // pixel loop: the ridges of warped noise are thin, branching veins, pale
+  // ones and fainter dark ones, softened at their edges. The warp costs the
+  // most, so only the pale veins swirl. A fraction of the loop's fuel, so the
+  // whole butterfly can wear it.
+  marbleVeins(p: list<vec2>, len: f32, key: i32, pale: color, dark: color) {
+    b = box(p)
+    s = 2.2 / len
+    pales = noise.mask(b[0], b[1] - b[0], noise.mode_ridge, {s, s * 0.8}, 0.86, key,
+                       octaves = 3, softness = 0.05, comparison = noise.above, warp_amount = 1.4)
+    darks = noise.mask(b[0], b[1] - b[0], noise.mode_ridge, {s * 1.3, s}, 0.88, key ^ 0x5bd1e995,
+                       octaves = 2, softness = 0.04, comparison = noise.above, warp_amount = 0.0)
+    surface.paint(darks, dark, blend = surface.source_over)
+    surface.paint(pales, pale, blend = surface.source_over)
   }
 
   // Lace: a dotted line inside the margin, a scallop over every cell and a
