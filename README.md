@@ -18,7 +18,7 @@ with this skill? Sell it there.
 ## Install
 
 ```sh
-git clone <this repository> ~/.claude/skills/iprop-asset
+git clone https://github.com/jCzachor6/iprop-asset-skill ~/.claude/skills/iprop-asset
 # or, from a checkout: ln -s "$PWD" ~/.claude/skills/iprop-asset
 ```
 
@@ -76,3 +76,11 @@ When an Infinite Props release changes the language, set `DEFAULT_VERSION` in
 snippets and the examples with that SDK, checks the shield's part outputs and checks that the lint
 still flags its fixtures. Fuel figures in the READMEs and `references/examples.md` change with the
 fuel tariff, so measure them again with the new SDK.
+
+## License
+
+The skill is under [0BSD](LICENSE): use, change, share and sell it for anything, with or without
+credit. The exceptions are four example assets, `examples/butterfly`, `examples/potion`,
+`examples/sword` and `examples/tree`: they stay all rights reserved. You can use them with the
+skill and learn from them, but not sell them or put them in a game or another product. The
+`LICENSE` file has the exact terms.

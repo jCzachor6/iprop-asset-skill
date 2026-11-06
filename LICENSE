@@ -1,0 +1,39 @@
+Copyright (C) 2026 by Jakub Czachor
+
+Except for the files listed under "Exceptions" below, permission to use, copy,
+modify, and/or distribute this software for any purpose with or without fee is
+hereby granted.
+
+THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH
+REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
+AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,
+INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
+LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR
+OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+PERFORMANCE OF THIS SOFTWARE.
+
+
+Exceptions
+
+The following example assets, with every file in their folders, are not
+covered by the permission above:
+
+  examples/butterfly/
+  examples/potion/
+  examples/sword/
+  examples/tree/
+
+Copyright (C) 2026 by Jakub Czachor. All rights reserved.
+
+You may keep and use them as part of a copy of this skill, read them, render
+them with the skill's tools, and learn from them when writing your own assets.
+You may redistribute them only inside a complete copy or fork of this
+repository that includes this LICENSE file.
+
+You may not sell them, publish them on their own, or use them, modified
+versions of them or substantial parts of them in a game, an asset pack or any
+other product. The butterfly, potion and sword generators can be bought on
+https://iprop.store.
+
+They are provided under the same disclaimer of warranty and liability as the
+rest of this repository.
