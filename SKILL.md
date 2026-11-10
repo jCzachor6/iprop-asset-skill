@@ -1,6 +1,6 @@
 ---
 name: iprop-asset
-description: Create, extend, fix and review Infinite Props assets, the seeded procedural props written as `.ips` recipes (an asset, its parts and material libraries) and compiled to `.iprop` for games. Teaches the language up to 0.9 (materials, steppers, samplers, weighted distributions, layers and masks, noise masks, Voronoi regions with gaps and bevels, dynamic parts), splitting a prop into characteristic features that grow new variants and colours, compiling and rendering with the SDK (ipc, ipval, ipgen), checking every seed, linting the pixel art, reviewing contact sheets and using the result in a game engine. Use it whenever someone wants to make, write, generate, port, improve, extend, debug or review an Infinite Props / iprop / .ips asset, a procedural sprite or prop generator, or seeded pixel-art objects for a game (weapons, potions, trees, crates, furniture, creatures and the like), even when they do not name the language. Not for packaging store listings or for changing the compiler itself.
+description: Create, extend, fix and review Infinite Props assets, the seeded procedural props written as `.ips` recipes (an asset, its parts and material libraries) and compiled to `.iprop` for games. Teaches the 1.0 language (materials, steppers, samplers, weighted distributions, layers and masks, noise masks, Voronoi regions with gaps and bevels, dynamic parts), splitting a prop into characteristic features that grow new variants and colours, compiling and rendering with the SDK (ipc, ipval, ipgen), checking every seed, linting the pixel art, reviewing contact sheets and using the result in a game engine. Use it whenever someone wants to make, write, generate, port, improve, extend, debug or review an Infinite Props / iprop / .ips asset, a procedural sprite or prop generator, or seeded pixel-art objects for a game (weapons, potions, trees, crates, furniture, creatures and the like), even when they do not name the language. Not for packaging store listings or for changing the compiler itself.
 ---
 
 # Create Infinite Props assets
@@ -12,14 +12,15 @@ input force one aspect without disturbing the rest.
 
 Sources are `.ips` files; `ipc` compiles them into one self-contained `.iprop` that runtimes for
 C, Godot, Unity, the web, Swift, Kotlin and Python generate from. Write in the current language
-(0.9), not in the style of older code you may find.
+(1.0), not in the style of older code you may find: 1.0 renamed several builtins (`stream.push`,
+`noise.value`, `color.set_a`), and an older spelling no longer compiles.
 
 ## Before writing code
 
-1. **Get the SDK.** `node <skill>/scripts/sdk.mjs` downloads Infinite Props 0.9.0 into a cache
-   (SHA-256 checked, macOS arm64, Linux x64 or Windows x64), or uses `IPROP_SDK` when it points at
-   an unpacked SDK. It prints the tools and the path of `LLM_REFERENCE.md` for that exact version,
-   with the line where every section starts.
+1. **Get the SDK.** `node <skill>/scripts/sdk.mjs` downloads Infinite Props 1.0.0 into a cache
+   (SHA-256 checked; macOS on Apple silicon or Intel, Linux x64 or Windows x64), or uses
+   `IPROP_SDK` when it points at an unpacked SDK. It prints the tools and the path of
+   `LLM_REFERENCE.md` for that exact version, with the line where every section starts.
 2. **Read the reference.** Read `LLM_REFERENCE.md` from line 1 to the end of "Compiler rules"
    (about 440 lines): the house style, the before/after pairs and the typing rules. Then read the
    sections you use as you use them (materials, parts, layers and masks, geometry, the builtins
@@ -104,16 +105,17 @@ README. Never invent outputs the user did not ask for.
   palettes (`palette hues = [#2a6a44 to #7ab23c, ...]`), keep rare looks rare with `weighted`, and
   derive related tones with `color.mix`, `color.shade`, `color.hsv` or a material.
 - A seed alone gives a different prop. Inputs default to "roll it" (0, or a transparent colour);
-  a rolled value hashes the seed or draws inside its own `stream_push(...)`/`stream_pop()`, so it
+  a rolled value hashes the seed or draws inside its own `stream.push(...)`/`stream.pop()`, so it
   renders exactly like the same value forced.
 - Name every stream: `const i32 shapeKey = 0x51ed2701`, one key per purpose (the kind, the shape,
   the colours, each part), and derive them from `start = seed`, saved on the first line of `draw`:
-  `stream_push(hash(start ^ shapeKey))`, `blade.draw(hash(start ^ bladeKey), ...)`.
+  `stream.push(hash(start ^ shapeKey))`, `blade.draw(hash(start ^ bladeKey), ...)`.
 - Roll the shape in its own stream before anything depends on style or colour, and make every
   roll whatever the branch, so a forced input never shifts the rolls after it.
 - Helpers see palettes, constants and `seed`, not inputs: pass what they need as typed parameters.
-- Paint rows (`rect` per row), lines, ovals and polygons, not pixel loops: fuel is limited
-  (5,000,000 per generation) and a level spends it many times over.
+- Paint rows (`rect` per row), lines, ovals and polygons, not pixel loops: fuel is generation
+  time, and a level spends it many times over. The budget (25,000,000 per generation since 1.0,
+  five times that of 0.9) is a ceiling, not a target.
 - A texture (spots, patches, seams, veins, moss) is one `noise.mask`, and pieces (stones, tiles,
   plates, shards) are a `voronoi` cut into `regions`, never a pixel loop. Both take an explicit seed
   and draw from no stream: give each a key of its own (`hash(start ^ mossKey)`), so adding one
@@ -126,7 +128,7 @@ README. Never invent outputs the user did not ask for.
 - Outputs only when the game reads them: `output point anchor`, `output rect collider`, mount
   points, `output list circle` for many. A prop with none is complete.
 
-## Language features to reach for (0.6-0.9)
+## Language features to reach for (0.6-1.0)
 
 | Need | Use | Since |
 | --- | --- | --- |
@@ -142,6 +144,10 @@ README. Never invent outputs the user did not ask for.
 | stones, tiles, plates, cracks | `voronoi(origin, size, 24, hash(start ^ wallKey), voronoi.grid, 0.4, 1)`, `regions.gap(regions(d), 1.5, 0.3, hash(start ^ gapKey))`, `regions.mask(rs, i)`, `regions.bevel(rs, 2, {-1, -1})` | 0.9 |
 | a drawn shape as geometry | `contour(mask, 0.5)`, then `regions(...)` | 0.9 |
 | pieces placed, recoloured or handed to the game one by one | `parts.from_regions(rs)`, `part.fill` or `part.texture`, `part.place(p, at, rot, mirror_x, mirror_y)`, `part.draw(p)`, `output list part pieces` | 0.9 |
+
+1.0 adds no feature. It gives every builtin one spelling and every name one rule, and its compiler
+writes a default budget of 25,000,000 fuel into a program; `references/language.md` ("From 0.9 to
+1.0") lists what changed.
 
 ## Things that bite
 
@@ -164,7 +170,7 @@ README. Never invent outputs the user did not ask for.
   the shape's rolls); give each its own. `references/features.md` explains the keys.
 - A distribution whose parameters miss the drawn range (`14.0 to 26.0 with gaussian(0.5, 0.18)`)
   traps at run time. Also traps: integer division by zero, running out of fuel, an unbalanced
-  `stream_pop`, reading a part output that was never set. `ipc --check` passes them; only renders
+  `stream.pop`, reading a part output that was never set. `ipc --check` passes them; only renders
   find them, which is why the check scans 200 seeds.
 - `ipgen --uniform` takes a negative `i32` as its unsigned pattern (`4294967295` for -1); the skill's
   scripts convert it for you.
@@ -177,14 +183,26 @@ README. Never invent outputs the user did not ask for.
 - Voronoi sites at one distance from a point meet in one vertex, where `regions.gap` can trap
   (`region offset has an ambiguous touching boundary`): jitter the distances.
 - `diagram2d`, `regions2d`, `part2d` and the other handles live in `draw` and helpers only: they
-  cannot be consts, inputs, palette or list elements. Do not name an import `part` or `parts`:
-  `part.draw(p)` with one argument is the 0.9 dynamic part.
+  cannot be consts, inputs, palette or list elements.
+- Names (1.0). The inputs, outputs, palettes, constants, helpers and imports of one asset share one
+  namespace, so an output `glow` and a helper `glow(...)` cannot coexist. A helper's parameter
+  cannot be called like a palette or an output of its asset (`tone(light: f32)` beside
+  `output circle light`), a helper cannot take a builtin's name (`lerp`, `rect`), and an import
+  cannot be called like a builtin namespace (`part`, `parts`, `regions`, `noise`, `color`, `stream`
+  and the like): name a part's import after its feature (`blade`, `boss`). `seed` and `draw` cannot
+  be declared at all. Each of these is a compile error that says which two names collide.
+- Operators (1.0). `&`, `|`, `^`, `<<` and `>>` bind tighter than comparisons, so
+  `flags & 1 == 0` tests the masked bit. `a < b < c` does not compile: write `a < b && b < c`.
+  A decimal literal cannot start with a zero (`010`).
+- An older spelling (`stream_push`, `noise(x, y, seed)`, `fill(d, w)`, `color.set.a`, `i32trunc`,
+  `pick(n)`, `poly(colour, x0, y0, ...)`) is a compile error whose message names the replacement.
 - `ipgen` renders an asset with `output list part` only with `--omit-part-outputs` (the scripts add
   it, and the check lists such outputs without checking them); games read the parts through the
   typed result API of their binding.
-- Materials need 0.8, noise masks, geometry and dynamic parts 0.9: use the 0.9.0 SDK from
-  `sdk.mjs`. 0.9 counts fuel with a new tariff (masks, layers, blur and paint cost less), so fuel
-  figures measured with 0.8 do not carry over.
+- Everything here is written for 1.0: use the 1.0.0 SDK from `sdk.mjs`, because an older compiler
+  rejects the 1.0 spellings. Fuel is priced as in 0.9 (masks, layers, blur and paint cost less than
+  in 0.8); the 1.0 compiler emits slightly cheaper loops, so the same asset spends a few percent
+  less than it did with 0.9. Compare fuel only within one release.
 - Leave room for outlines, glows and blur inside the canvas; the check warns when seeds touch the
   edge, except the bottom edge when the origin stands there.
 - `v` and `a` are ordinary names, not built-in controls: declare only the inputs the asset needs and
@@ -198,8 +216,8 @@ README. Never invent outputs the user did not ask for.
   measure.
 - `references/examples.md`: tree, sword, potion, butterfly and shield in `examples/` (four of them
   use the 0.9 features), and which SDK examples are worth reading.
-- `references/language.md`: reading the reference, the 0.6-0.9 features with snippets, diagnostics,
-  traps, and modernising older sources.
+- `references/language.md`: reading the reference, the 0.6-1.0 features with snippets, what 1.0
+  renamed, diagnostics, traps, and modernising older sources.
 - `references/pixel-art.md`: quality rules for both styles, and the lint codes.
 - `references/review.md`: the review loop and what each check means.
 - `references/game-use.md`: using the compiled asset in a game.

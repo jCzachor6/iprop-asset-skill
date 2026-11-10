@@ -52,21 +52,21 @@ asset __NAME__ {
 
     // The shape has a stream of its own and makes every roll, whatever the
     // kind, so a forced kind keeps the seed's proportions.
-    stream_push(hash(start ^ shapeKey))
+    stream.push(hash(start ^ shapeKey))
     half = lerp(maxHalf * 0.55, maxHalf, 0.0 to 1.0 with typical)
     tall = lerp(maxTall * 0.5, maxTall, 0.0 to 1.0 with typical)
     lean = -1.5 to 1.5 with gaussian(mean = 0.0, sigma = 0.6)
     markY = 0.3 to 0.7 with typical
-    stream_pop()
+    stream.pop()
     if (look == 2) { half = half * 0.7 }
     if (look == 3) { tall = tall * 0.6 }
 
     // Colours have a stream of their own too: a family, then a shade in it.
-    stream_push(hash(start ^ colorKey))
+    stream.push(hash(start ^ colorKey))
     base = bodies[0 to 2 with families].pick()
     marked = chance(0.3)
-    stream_pop()
-    if (tint.a != 0) { base = color.set.a(tint, 255) }
+    stream.pop()
+    if (tint.a != 0) { base = color.set_a(tint, 255) }
     // Five tones from a cool shadow to a warm light; the outline is darker.
     tones = stepper(color.mix(base, #1a2238, 0.5) to color.mix(base, #fff2c8, 0.45)).pick(5)
     outline = color.mix(base, #0c1018, 0.75)
@@ -95,14 +95,14 @@ asset __NAME__ {
 
   // The kind a seed rolls: weighted, in a stream of its own.
   rolledKind(start: i32) -> i32 {
-    stream_push(hash(start ^ kindKey))
+    stream.push(hash(start ^ kindKey))
     look = 1 to 3 with kinds
-    stream_pop()
+    stream.pop()
     return look
   }
 
   // The tone at a lightness from 0 (shadow) to 1 (light).
-  toneAt(light: f32) -> i32 {
-    return int(clamp(light, 0.0, 1.0) * 4.0 + 0.5)
+  toneAt(lightness: f32) -> i32 {
+    return int(clamp(lightness, 0.0, 1.0) * 4.0 + 0.5)
   }
 }

@@ -42,7 +42,7 @@ asset __PART__ {
   }
 
   // The tone at a lightness from 0 (shadow) to 1 (light).
-  toneAt(light: f32) -> i32 {
-    return int(clamp(light, 0.0, 1.0) * 4.0 + 0.5)
+  toneAt(lightness: f32) -> i32 {
+    return int(clamp(lightness, 0.0, 1.0) * 4.0 + 0.5)
   }
 }

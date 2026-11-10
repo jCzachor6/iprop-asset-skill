@@ -116,7 +116,7 @@ asset ShieldBoard {
     // them keeps its place.
     n = clamp(int(planks), 2, 7)
     pw = faceHalf * 2.0 / float(n)
-    stream_push(hash(seed ^ grainKey))
+    stream.push(hash(seed ^ grainKey))
     layer seamLines(alpha = surface.source_over) {
       for k in 1..n {
         sx = round(cx - faceHalf + pw * float(k) + (-0.7 to 0.7))
@@ -133,7 +133,7 @@ asset ShieldBoard {
         }
       }
     }
-    stream_pop()
+    stream.pop()
     mask seamM = mask.intersect(mask.from(seamLines), faceM)
     surface.paint(mask.intersect(mask.from(grain), faceM), tones[1], blend = surface.source_over)
 
@@ -152,7 +152,7 @@ asset ShieldBoard {
     }
 
     // ---- wear: chips where the paint has come off, mostly near the rim --------
-    stream_push(hash(seed ^ wearKey))
+    stream.push(hash(seed ^ wearKey))
     count = int(wear * 14.0)
     layer chips(alpha = surface.source_over) {
       for i in 0..14 {
@@ -167,7 +167,7 @@ asset ShieldBoard {
         }
       }
     }
-    stream_pop()
+    stream.pop()
     mask paintM = mask.subtract(faceM, mask.from(chips))
     mask groove = mask.intersect(seamM, paintM)
 
@@ -175,7 +175,7 @@ asset ShieldBoard {
     // grooves, in the paint's own deep tone where the paint holds ------------
     surface.paint(seamM, tones[0], blend = surface.source_over)
     if (field.a != 0) {
-      fp = mats.Paint(base = color.set.a(field, 255))
+      fp = mats.Paint(base = color.set_a(field, 255))
       surface.paint(paintM, fp.base, blend = surface.source_over)
       surface.paint(mask.intersect(paintM, shadeZone), fp.shadow, blend = surface.source_over)
       surface.paint(mask.intersect(paintM, litZone), fp.light, blend = surface.source_over)

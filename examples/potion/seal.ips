@@ -46,19 +46,19 @@ asset BottleSeal {
       lights = stepper(base to wax.light).pick(3)
       tones = [darks[0], darks[1], base, lights[1], lights[2]]
       // Two clipped ribbon ends remain behind the wax, with a clear stamp.
-      poly(binding[0], x - 2.3, y + 1.0, x + 2.0, y + 1.0,
-           x + 2.4, y + 5.6, x, y + 4.6, x - 2.3, y + 5.4)
-      poly(binding[2], x - 1.5, y + 2.0, x + 1.1, y + 2.0,
-           x + 1.5, y + 4.1, x, y + 3.5, x - 1.5, y + 4.2)
-      poly(tones[0], x - 2.3, y - 3.5, x + 1.6, y - 3.7,
+      poly(x - 2.3, y + 1.0, x + 2.0, y + 1.0,
+           x + 2.4, y + 5.6, x, y + 4.6, x - 2.3, y + 5.4, binding[0])
+      poly(x - 1.5, y + 2.0, x + 1.1, y + 2.0,
+           x + 1.5, y + 4.1, x, y + 3.5, x - 1.5, y + 4.2, binding[2])
+      poly(x - 2.3, y - 3.5, x + 1.6, y - 3.7,
            x + 3.6, y - 1.6, x + 3.6, y + 1.3, x + 1.4, y + 3.5,
-           x - 1.8, y + 3.4, x - 3.6, y + 1.2, x - 3.5, y - 1.6)
+           x - 1.8, y + 3.4, x - 3.6, y + 1.2, x - 3.5, y - 1.6, tones[0])
       oval(x, y - 0.1, 2.9, 2.8, tones[2])
       curve({x - 2.3, y + 0.3}, {x - 2.4, y - 2.4}, {x + 0.9, y - 2.5}, 1, tones[4])
       curve({x - 0.9, y + 2.4}, {x + 2.3, y + 2.4}, {x + 2.5, y - 0.2}, 1, tones[1])
       if (stamp == 0) {
         // A tiny impressed drop: dark inset and a lit lower lip.
-        poly(tones[0], x, y - 1.6, x + 1.3, y + 0.5, x, y + 1.4, x - 1.1, y + 0.5)
+        poly(x, y - 1.6, x + 1.3, y + 0.5, x, y + 1.4, x - 1.1, y + 0.5, tones[0])
         pixel(int(x), int(y + 1.0), tones[3])
       } else {
         line(x - 1.0, y - 1.0, x + 1.0, y + 1.0, 1, tones[0])
@@ -68,12 +68,12 @@ asset BottleSeal {
     } else if (style == 2) {
       tones = stepper(paper.deep to paper.light).pick(6)
       // Cut corners and a folded lower corner distinguish paper from a block.
-      poly(tones[0], x - 3.8, y - 2.2, x - 2.3, y - 3.7, x + 3.4, y - 3.0,
-           x + 3.9, y + 2.5, x + 2.0, y + 4.2, x - 3.1, y + 3.5)
-      poly(tones[4], x - 2.8, y - 2.0, x - 1.8, y - 2.7, x + 2.5, y - 2.1,
-           x + 2.8, y + 2.2, x + 1.6, y + 3.2, x - 2.3, y + 2.6)
+      poly(x - 3.8, y - 2.2, x - 2.3, y - 3.7, x + 3.4, y - 3.0,
+           x + 3.9, y + 2.5, x + 2.0, y + 4.2, x - 3.1, y + 3.5, tones[0])
+      poly(x - 2.8, y - 2.0, x - 1.8, y - 2.7, x + 2.5, y - 2.1,
+           x + 2.8, y + 2.2, x + 1.6, y + 3.2, x - 2.3, y + 2.6, tones[4])
       line(x - 2.4, y - 2.0, x + 1.9, y - 2.1, 1, tones[5])
-      poly(tones[2], x + 1.3, y + 1.5, x + 2.8, y + 2.2, x + 1.6, y + 3.2)
+      poly(x + 1.3, y + 1.5, x + 2.8, y + 2.2, x + 1.6, y + 3.2, tones[2])
       pixel(int(x - 1.1), int(y - 1.7), binding[0])
       line(x - 1.4, y, x + 1.5, y, 1, tones[1])
       line(x - 1.2, y + 1.4, x + 0.5, y + 1.4, 1, tones[2])
@@ -91,7 +91,7 @@ asset BottleSeal {
         line(x, y - 1.1, x, y + 1.0, 1, tones[0])
         line(x - 0.8, y - 0.5, x + 0.9, y - 0.5, 1, tones[0])
       } else {
-        poly(tones[0], x, y - 1.5, x + 1.2, y, x, y + 1.5, x - 1.2, y)
+        poly(x, y - 1.5, x + 1.2, y, x, y + 1.5, x - 1.2, y, tones[0])
       }
       pixel(int(x + 1.0), int(y + 2.0), tones[5])
     }

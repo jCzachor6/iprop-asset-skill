@@ -169,6 +169,8 @@ test("new-asset refuses names the template already uses and unknown levels", () 
     const run = (...args) => spawnSync(process.execPath, [script, dir, "--name", "Totem", ...args], { encoding: "utf8" })
     assert.equal(run("--composed", "--features", "shape,post").status, 2)
     assert.equal(run("--composed", "--features", "main").status, 2)
+    // A feature becomes an import alias, and 1.0 keeps the builtin namespaces for itself.
+    for (const namespace of ["noise", "part", "stream", "regions"]) assert.equal(run("--composed", "--features", `base,${namespace}`).status, 2, namespace)
     assert.equal(run("--outputs", "half").status, 2)
     assert.equal(run("--outputs", "glow:sphere").status, 2)
     assert.equal(run("--variety", "huge").status, 2)

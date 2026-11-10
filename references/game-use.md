@@ -6,10 +6,12 @@
 `<entry>.iprop` next to each entry; `ipc <entry>.ips -o <path>.iprop` does the same without the
 checks. Each entry becomes one self-contained file: its parts and materials are linked in, and the
 game never loads `.ips` sources. Keep the sources as the truth and recompile when the SDK changes.
-An asset that uses no 0.9 builtin compiles to the same bytes with 0.9 as with 0.8 and runs on 0.8
-runtimes (the five models did, before their 0.9 additions); one that uses noise masks, geometry or
-dynamic parts needs a 0.9 runtime. 0.9 runtimes draw older files with the same pixels and outputs,
-but charge fuel by the new tariff.
+The file format has not changed since 0.9: a program compiled with 1.0 holds no new instruction,
+so it also runs on a 0.9 runtime, with the same pixels, outputs and fuel, and a 1.0 runtime runs
+every file compiled with 0.9 as before. The file carries its own fuel budget: 25,000,000 when 1.0
+compiled it, 5,000,000 when 0.9 did, until it is recompiled. An asset that uses noise masks,
+geometry or dynamic parts needs a 0.9 runtime or newer; 0.9 and 1.0 runtimes draw files older
+than that with the same pixels and outputs, but charge fuel by the 0.9 tariff.
 
 ## Runtimes
 

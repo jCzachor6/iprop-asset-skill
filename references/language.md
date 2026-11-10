@@ -34,17 +34,21 @@ The handbook chapters behind it are in the SDK's `docs/language/*.md`, with long
 | vec2 overloads of the drawing builtins | 0.7.2 |
 | material libraries | 0.8.0 |
 | `noise.mask`; `noise.fbm` with lacunarity and gain, `noise.cell2`, `noise.cell_id`, `noise.warp_vec`; `voronoi`, `contour`, `regions` with `gap`, `bevel` and `mask`; dynamic parts (`part.*`, `parts.*`, `output list part`); a new fuel tariff and a separate host work limit | 0.9.0 |
+| one spelling per builtin (`noise.value`, `stream.push`, `color.set_a`, `dist.fill`, `vec2.fold`), one namespace for the names of an asset, bitwise operators that bind tighter than comparisons; a default fuel budget of 25,000,000 (was 5,000,000); an SDK for Macs with Intel processors | 1.0.0 |
 
 0.7 removed the implicit `v`/`a` controls and reserved `const`, `to`, `with`, `distribution`,
 `sampler`, `stepper`, `weighted`, `density`, `layer`, `mask` and `clip`; `surface` cannot be an
 import alias. `material` is a contextual keyword in 0.8. 0.9 reserves nothing new: the handle
-types (`diagram2d`, `contours2d`, `regions2d`, `part2d`, `parts2d`) are contextual names.
+types (`diagram2d`, `contours2d`, `regions2d`, `part2d`, `parts2d`) are contextual names. 1.0 adds
+no feature and no word; it renames builtins and tightens the rules for names and operators
+("From 0.9 to 1.0" below). A source written for 0.9 needs those changes before a 1.0 compiler
+takes it, and a 1.0 source does not compile with 0.9.
 
 ## The features, in code
 
 The snippets up to "Outputs" come from `references/snippets/` (`crate.ips`, `looks.ips`,
-`parts/band.ips`), an asset that compiles and renders with 0.9.0; the 0.9 ones come from the model
-assets in `examples/`. The tests compile both.
+`parts/band.ips`), an asset that compiles and renders with 1.0.0; the noise-mask, geometry and
+dynamic-part ones come from the model assets in `examples/`. The tests compile both.
 
 **Ranges and distributions.** A range picks `i32` or `f32` from its bounds; `with` shapes it in the
 units of the drawn value.
@@ -77,13 +81,13 @@ seed before any draw moves `seed`.
     start = seed
     look = clamp(kind, 0, 2)
     if (look == 0) {
-      stream_push(hash(start ^ kindKey))
+      stream.push(hash(start ^ kindKey))
       look = 1 to 2 with kinds
-      stream_pop()
+      stream.pop()
     }
-    stream_push(hash(start ^ shapeKey))   // the shape: every roll, whatever the kind
+    stream.push(hash(start ^ shapeKey))   // the shape: every roll, whatever the kind
     ...
-    stream_pop()
+    stream.pop()
 ```
 
 **Colours.** One gradient draw per colour; palettes for fixed sets; derived tones.
@@ -99,7 +103,7 @@ seed before any draw moves `seed`.
 Gradient palettes hold descriptions; draw a colour with `.pick()`:
 `palette woods = [#5a4230 to #7a5c40, #6a5a48 to #8a7a64]` then `woods[0 to 1 with kinds].pick()`.
 `color.hsv(c, hue, saturation, value)` shifts the hue by turns and scales saturation and value;
-`color.shade(c, steps)`, `color.mix(a, b, t)`, `color.scale(c, k)` and `color.set.a(c, alpha)` do
+`color.shade(c, steps)`, `color.mix(a, b, t)`, `color.scale(c, k)` and `color.set_a(c, alpha)` do
 the rest. A colour input reads its channels: `tint.a != 0`.
 
 **Constants, samplers and lists.**
@@ -131,7 +135,7 @@ material Wood {
 import looks from "looks.ips"
 ...
     wood = looks.Wood()                                   // rolls every range once, in field order
-    if (tint.a != 0) { wood = looks.Wood(base = color.set.a(tint, 255)) }   // later fields follow
+    if (tint.a != 0) { wood = looks.Wood(base = color.set_a(tint, 255)) }   // later fields follow
 ```
 
 Create instances only by assignment, pass them to helpers typed `m: looks.Wood`, and give a part a
@@ -185,10 +189,10 @@ need their own placement, appearance or export. All of them take an explicit see
 from the current stream and cannot be consts: give each a key (`hash(start ^ fissureKey)`), so
 adding one moves no other roll.
 
-**Noise masks** (`potion.ips`, its rare crackled glass). `noise.mask(origin, size, kind,
+**Noise masks** (`potion.ips`, its rare crackled glass). `noise.mask(origin, size, mode,
 frequency, threshold, seed)` samples a noise field over the rectangle and keeps where it passes the
 threshold; the named tail adds `octaves` (1-8), `softness` (0 is crisp), `comparison` and
-`warp_amount`. Kinds: `noise.mode_value`, `mode_grad`, `mode_fbm`, `mode_cell` (spots below a
+`warp_amount`. Modes: `noise.mode_value`, `mode_grad`, `mode_fbm`, `mode_cell` (spots below a
 threshold), `mode_cell_edge` (seams below one, patches above), `mode_ridge` (veins above a high
 one). The threshold is the raw noise value, and the field stays anchored to the canvas when the
 rectangle moves.
@@ -197,7 +201,7 @@ rectangle moves.
     fissures = noise.mask({0, 0}, {64, 64}, noise.mode_cell_edge, {0.14, 0.14}, 0.08,
                           hash(start ^ fissureKey), octaves = 1, softness = 0.0,
                           comparison = noise.below, warp_amount = 0.3)
-    surface.paint(fissures, color.set.a(#eef8ff, 100), blend = surface.source_over)
+    surface.paint(fissures, color.set_a(#eef8ff, 100), blend = surface.source_over)
 ```
 
 A mask combines like any other. The tree's moss is two bands of fbm noise kept inside the wood,
@@ -285,6 +289,15 @@ parameters and return values; they cannot be consts, inputs, palette or list ele
 | comparing colours with `==` | compare channels: `c.a == 0` |
 | `geometry handles depend on generation and cannot be const` | build the diagram, regions or parts in `draw` or a helper |
 | `list elements must be scalar values, sampler<T> or stepper<T>, got part2d` | keep pieces in a `parts2d` (`parts.from_regions`) or loop over region indices |
+| `undefined function 'noise'; it was renamed to 'noise.value'`, `function 'noise.mask' has no argument 'kind'; it was renamed to 'mode'` | a 0.9 spelling: write the name the message gives ("From 0.9 to 1.0" below) |
+| `pick expects at least two choices; use index(n)`, `poly takes its color last, after the vertices` | `pick(n)` is `index(n)`; `poly(x0, y0, ..., color)` |
+| `parameter 'light' has the same name as an output` (or `a palette`) | rename the helper's parameter |
+| `function 'glow' has the same name as an output`, `palette 'hot' has the same name as an input`, `const 'tone': name collides with an asset declaration` | inputs, outputs, palettes, constants, helpers and imports of an asset share one namespace: rename one of the two |
+| `function 'lerp' has the name of a builtin; choose another name` | rename the helper; before 1.0 such a helper was silently never called |
+| `import alias 'part' conflicts with the part namespace; rename the alias` | call the import after its feature (`shard`, `blade`) |
+| `comparisons cannot be chained` | `a < b && b < c` |
+| `output 'anchor' is write-only; keep the value in a local to read it` | compute into a local, then assign the output from it |
+| `vec2 has no method 'len'; write vec2.len(...)` | builtins are functions: `vec2.len(v)`, `list.len(items)` |
 
 ## Traps (they pass `--check` and fail at run time)
 
@@ -293,7 +306,7 @@ parameters and return values; they cannot be consts, inputs, palette or list ele
 | a distribution with no mass in its range | parameters in the wrong units: `14.0 to 26.0 with gaussian(0.5, 0.18)`; use the value's units or `lerp(lo, hi, 0.0 to 1.0 with d)` |
 | fuel exhausted | pixel loops or too many shapes: paint rows, reuse layers and masks, split heavy features |
 | integer division by zero | guard divisors (`max(n, 1)`) |
-| an unbalanced `stream_pop` | every `stream_push` needs a `stream_pop` on every path |
+| an unbalanced `stream.pop` | every `stream.push` needs a `stream.pop` on every path |
 | reading an output never set | read a part's output only after a call that sets it, on every branch |
 | `slot does not belong to the last called part` | a part's output read after another part was drawn: read every output right after its own call |
 | a list index out of range | indexes are `i32`, from 0 to `list.len(items) - 1` |
@@ -304,6 +317,40 @@ parameters and return values; they cannot be consts, inputs, palette or list ele
 
 `check-asset` scans seeds 1-200 because a trap often needs a rare seed. Raise `--scan` for assets
 with rare looks.
+
+## From 0.9 to 1.0
+
+1.0 changes spellings and rules only: a migrated source compiles to the program it produced under
+0.9, with the same pixels and outputs. Nothing is aliased; every old spelling is a compile error
+that names the new one. The SDK's `docs/language/migration-v1.0.md` is the full list.
+
+| 0.9 | 1.0 |
+| --- | --- |
+| `stream_push(seed)`, `stream_pop()` | `stream.push(seed)`, `stream.pop()` |
+| `noise(x, y, seed)`, `fault(x, y, seed)`, `warp(x, y, amount, seed)` | `noise.value(...)`, `noise.fault(...)`, `noise.warp(...)` |
+| `fold(v, n)`, `polar(v)` | `vec2.fold(v, sectors)`, `vec2.polar(v)` |
+| `fill(d, w)` | `dist.fill(distance, width)` |
+| `color.set.a(c, alpha)` | `color.set_a(c, alpha)` |
+| `i32trunc(x)` | `int(x)` |
+| `pick(n)` | `index(n)`; `pick` chooses among two or more values |
+| `poly(colour, x0, y0, x1, y1, x2, y2)` | `poly(x0, y0, x1, y1, x2, y2, colour)`: the colour comes last, as everywhere |
+| named arguments `kind` of `noise.mask`, `a` of `vec2.rot`, `image` of `surface.paint` | `mode`, `angle`, `source` |
+| named handles `p`, `rs`, `d` of the `part.*`, `regions.*` and `diagram.*` accessors, `source` of `regions.gap`, `regions.bevel`, `parts.count` and `parts.get` | `part`, `regions`, `diagram`, `parts` |
+
+The rules that changed with it:
+
+- **Names.** The inputs, outputs, palettes, constants, helpers and import aliases of one asset all
+  need different names. A helper cannot take the name of a bare builtin, a helper's parameter the
+  name of a palette or an output, an import the name of a builtin namespace (`noise`, `color`,
+  `vec2`, `dist`, `cell`, `stream`, `surface`, `list`, `diagram`, `regions`, `part`, `parts`,
+  `voronoi`, `contour`). `seed` and `draw` cannot be declared, and an input cannot be called `at`,
+  `rot`, `mirror_x` or `mirror_y`, the placement arguments of a part call.
+- **Operators.** Bitwise operators bind tighter than comparisons: `flags & 1 == 0` now means
+  `(flags & 1) == 0`. `a < b < c` and `a == b == c` are rejected.
+- **Literals and declarations.** A decimal literal cannot start with a zero, an integer literal
+  must fit 32 bits, and `size` and `origin` are declared once.
+- **Fuel.** The compiler writes a default budget of 25,000,000 instead of 5,000,000. Prices are
+  the same; a binary compiled earlier keeps the budget it was built with until it is recompiled.
 
 ## Modernising older sources
 

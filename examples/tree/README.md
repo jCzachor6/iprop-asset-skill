@@ -116,8 +116,8 @@ needles. The branch wood under each tier shows where the needles hang thin.
 
 ## Building
 
-The trees use materials and the broadleaf's moss a noise mask, so they need Infinite Props 0.9.0
-or newer. From the skill folder:
+The trees are written for Infinite Props 1.0 (they use materials, and the broadleaf's moss a
+noise mask). From the skill folder:
 
 ```sh
 node scripts/check-asset.mjs examples/tree
@@ -125,9 +125,9 @@ node scripts/sheet.mjs examples/tree/tree.ips --seeds 1-25
 node scripts/sheet.mjs examples/tree/spruce.ips --sweep kind=1,2,3 --seeds 1-8
 ```
 
-Fuel stays under 4,000,000. With Infinite Props 0.9, over seeds 0-1999 the
-heaviest broadleaf tree takes 3,672,699 (seed 803), the 99th percentile
-about 3.0 million and the median about 1.3 million; over seeds 0-299 the
-heaviest spruce takes 616,658 (seed 118) and the median about 390,000. No
+Fuel stays under 4,000,000. With Infinite Props 1.0, over seeds 0-1999 the
+heaviest broadleaf tree takes 3,534,259 (seed 803), the 99th percentile
+about 2.9 million and the median about 1.3 million; over seeds 0-299 the
+heaviest spruce takes 590,340 (seed 118) and the median about 370,000. No
 tree or spruce among the first 300 seeds reaches the left, right or top
 edge of the canvas.

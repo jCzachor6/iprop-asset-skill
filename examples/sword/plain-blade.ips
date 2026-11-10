@@ -33,9 +33,9 @@ asset PlainSwordBlade {
   const i32 acrossCKey = 0x299f31d0
 
   rustLayers(mode: i32) -> i32 {
-    stream_push(hash(seed ^ rustKey))
+    stream.push(hash(seed ^ rustKey))
     look = 1 to 7 with rustMixture
-    stream_pop()
+    stream.pop()
     if (mode >= 1 && mode <= 8) { look = mode }
     return rustMasks[look - 1]
   }

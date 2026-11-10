@@ -60,7 +60,7 @@ ones included, must meet the same bar.
 | Check | Means | Usual fix |
 | --- | --- | --- |
 | `compile` | diagnostics of every entry and unused library | the code and message; `references/language.md` |
-| `version`, `materials` | the sources use features the SDK in use cannot compile (0.9 builtins, 0.8 materials) | use the SDK `sdk.mjs` downloads, or set `IPROP_SDK` to a newer one |
+| `version`, `materials` | the sources use something the SDK in use cannot compile (the 1.0 spellings, 0.9 builtins, 0.8 materials) | use the SDK `sdk.mjs` downloads, or set `IPROP_SDK` to a newer one |
 | `ipval` | the compiled binary failed validation | rare; recompile with the same SDK, report it |
 | `traps` | seeds that stop with a run-time error | the trap table in `references/language.md` |
 | `empty` | seeds that draw nothing | a family or branch that never paints; a translucent paint on the legacy root |

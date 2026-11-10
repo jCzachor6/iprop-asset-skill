@@ -1,7 +1,7 @@
 # The model assets
 
 Five finished assets ship in `examples/`. Read the one closest to your task: its README first, then
-the root, then one part. Four are pixel art; the butterfly aims at realism. All compile with 0.9.0
+the root, then one part. Four are pixel art; the butterfly aims at realism. All compile with 1.0.0
 and pass `check-asset` (the sword with `--lint-off alpha` for its soft enchanted aura, the butterfly
 with `--style realistic`, its wing programs also with `--allow-edge`). Every file names its stream
 keys (`const i32 shapeKey = 0x51ed2701`) next to its other constants, and every root states its
@@ -47,7 +47,7 @@ Files: `tree.ips` (broadleaf), `spruce.ips` (conifer) and `materials.ips` (`Bark
   moss on the wood; two bands of a warped fbm `noise.mask`, denser near the ground, give the
   cushions; offsets of their own mask light their tops. The moss rolls in a stream of its own and
   its mask takes an explicit seed, so the other seven trees in ten keep every pixel.
-- Peak fuel about 3.7 million over seeds 0-1999, the most of the pixel-art models; look at
+- Peak fuel about 3.5 million over seeds 0-1999, the most of the pixel-art models; look at
   the heaviest seeds the check names.
 
 ## sword: features in two qualities, tiers, emission
@@ -73,7 +73,8 @@ Files: `sword.ips` (root), `blade.ips` + `hilt.ips` (soldier and ornate swords),
 - **Mount points**: `tip` and `grip` let a game put the sword in a hand and trail effects from its
   point; they stay stable across enchantments and materials.
 - The blades are painted pixel by pixel in the blade's own frame (along and across the blade),
-  because the shading follows the diagonal blade; the cost stays near 0.5 million. For the same
+  because the shading follows the diagonal blade; the cost stays near 0.45 million on average
+  and under a million at most. For the same
   reason the sword uses no 0.9 texture: a noise mask is laid out along the canvas axes, so its
   lines cannot follow a blade at 45 degrees, and on a blade five pixels wide they read as dirt.
 
@@ -121,10 +122,12 @@ program of its own). Its README describes the structure. What to take from it:
   wings' resolved style and colour scheme);
 - orthogonal, weighted axes (`style`, `scheme`, `motif`), each forced alone;
 - a texture drawn once as a mask and tiled with `mask.offset`;
-- splitting a feature into its own program when it needs a whole fuel budget;
-- a cheaper relative instead (0.9): the marble motif is a per-pixel loop that needs a wing
-  program's budget, so the single program used to draw ripples in its place; it now paints marble
-  veins from two ridge `noise.mask`es with soft edges (`marbleVeins`) for a fraction of the fuel;
+- splitting a feature into its own program when its detail costs millions of fuel: the wings were
+  split for the 5,000,000 budget of 0.9, and a game can still generate and cache them apart;
+- a cheaper relative instead (0.9): the marble motif is a per-pixel loop, too costly to run twice
+  in the single program under that budget, so it used to draw ripples in its place; it now paints
+  marble veins from two ridge `noise.mask`es with soft edges (`marbleVeins`) for a fraction of the
+  fuel;
 - soft painting: captured layers, `.blur(sigma)`, translucent shadows painted with source-over.
 
 It predates materials: its colours are gradient palettes indexed by style. Written today, a wing
@@ -158,7 +161,7 @@ prompt: a 48x48 shield for a top-down roguelike, with an anchor, a grip and a co
   `min_area`), each traced region becomes a dynamic part textured with the drawn shield, moves a
   pixel away from the hit and goes to `output list part shards`, so the game can spawn the same
   shards as debris through its binding's typed results.
-- Peak fuel about 243,000 intact and 313,000 shattered, on a kite whose emblem takes four passes.
+- Peak fuel about 242,000 intact and 312,000 shattered, on a kite whose emblem takes four passes.
 
 ## Examples in the SDK
 

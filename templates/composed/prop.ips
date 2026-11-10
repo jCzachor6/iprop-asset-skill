@@ -49,11 +49,11 @@ asset __NAME__ {
 
     // The shape has a stream of its own: every feature's size is rolled up
     // front, whatever the kind, so adding a feature never moves the others.
-    stream_push(hash(start ^ shapeKey))
+    stream.push(hash(start ^ shapeKey))
     half = lerp(maxHalf * 0.55, maxHalf, 0.0 to 1.0 with typical)
     tall = lerp(maxTall * 0.6, maxTall, 0.0 to 1.0 with typical)
     //__SHAPE__
-    stream_pop()
+    stream.pop()
     if (look == 1) { half = half * 0.75 }
     if (look == 2) { tall = tall * 0.8 }
     if (look == 3) { half = half * 0.85 }
@@ -61,11 +61,11 @@ asset __NAME__ {
 
     // Colours have a stream of their own. Parts take colours, not materials:
     // each builds its material again from the colour it receives.
-    stream_push(hash(start ^ colorKey))
+    stream.push(hash(start ^ colorKey))
     main = looks.Main()
     accent = looks.Accent()
-    stream_pop()
-    if (tint.a != 0) { main = looks.Main(base = color.set.a(tint, 255)) }
+    stream.pop()
+    if (tint.a != 0) { main = looks.Main(base = color.set_a(tint, 255)) }
 
     // Each feature stands on the one below it, at the point that part reports,
     // and draws from its own key.
@@ -76,9 +76,9 @@ asset __NAME__ {
 
   // The kind a seed rolls: weighted, in a stream of its own.
   rolledKind(start: i32) -> i32 {
-    stream_push(hash(start ^ kindKey))
+    stream.push(hash(start ^ kindKey))
     look = 1 to 3 with kinds
-    stream_pop()
+    stream.pop()
     return look
   }
 }

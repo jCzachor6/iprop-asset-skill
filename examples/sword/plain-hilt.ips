@@ -28,9 +28,9 @@ asset PlainSwordHilt {
   const i32 phaseKey = 0x3c6ef372     // the phase of the grain and the winding
 
   rustLayers(mode: i32) -> i32 {
-    stream_push(hash(seed ^ rustKey))
+    stream.push(hash(seed ^ rustKey))
     look = 1 to 7 with rustMixture
-    stream_pop()
+    stream.pop()
     if (mode >= 1 && mode <= 8) { look = mode }
     return rustMasks[look - 1]
   }

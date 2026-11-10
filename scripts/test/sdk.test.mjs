@@ -36,14 +36,17 @@ test("new-asset skeletons pass check-asset with no warnings", options, () => {
     make("--name", "StreetLamp", "--size", "32x64", "--composed", "--features", "base,post,lamp-head")
     make("--name", "Lantern", "--size", "32x48", "--outputs", "anchor,collider,flame,glow:circle", "--variety", "low")
     make("--name", "Shrine", "--size", "48x64", "--composed", "--features", "base,roof", "--outputs", "anchor,hitbox,offering")
+    // 1.0: a helper's parameter cannot be called like an output, so the templates leave `light` free.
+    make("--name", "Beacon", "--size", "32x48", "--outputs", "anchor,light:circle")
     const outputs = (report) => report.entries[0].checks.find((item) => item.label === "outputs").text
-    for (const name of ["stone", "street-lamp", "lantern", "shrine"]) {
+    for (const name of ["stone", "street-lamp", "lantern", "shrine", "beacon"]) {
       const { status, report } = check(join(dir, name))
       assert.equal(status, 0, `${name}: ${report.log.join("\n")}`)
       assert.deepEqual(warnings(report), [], `${name}: ${report.log.join("\n")}`)
       if (name === "stone" || name === "street-lamp") assert.match(outputs(report), /none declared/)
       if (name === "lantern") assert.match(outputs(report), /anchor, collider, flame, glow set/)
       if (name === "shrine") assert.match(outputs(report), /anchor, hitbox, offering set/)
+      if (name === "beacon") assert.match(outputs(report), /anchor, light set/)
     }
   } finally {
     rmSync(dir, { recursive: true, force: true })

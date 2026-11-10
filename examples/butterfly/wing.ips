@@ -167,29 +167,29 @@ asset ButterflyWing {
   draw {
     look = clamp(int(style), 1, 13)
     if (style == 0) {
-      stream_push(hash(seed ^ styleKey))
+      stream.push(hash(seed ^ styleKey))
       look = 1 to 13 with styleMix
-      stream_pop()
+      stream.pop()
     }
     rolledScheme = clamp(int(scheme), 1, 14)
     if (scheme == 0) {
-      stream_push(hash(seed ^ schemeKey))
+      stream.push(hash(seed ^ schemeKey))
       rolledScheme = 1 to 14 with schemeMix
-      stream_pop()
+      stream.pop()
     }
     rolledMotif = clamp(int(motif), 1, 9)
     if (motif == 0) {
-      stream_push(hash(seed ^ motifKey))
+      stream.push(hash(seed ^ motifKey))
       rolledMotif = 1 to 9 with motifMix
-      stream_pop()
+      stream.pop()
     }
     // The hair colour is shared with body.ips, which hashes the same seed.
-    stream_push(hash(seed ^ hairKey))
+    stream.push(hash(seed ^ hairKey))
     hair = hairs[look - 1].pick()
-    stream_pop()
+    stream.pop()
 
     // ---- silhouette: its own stream, so colours never move it ------------
-    stream_push(hash(seed ^ shapeKey))
+    stream.push(hash(seed ^ shapeKey))
     size = 0.80 to 1.0 with beta(2.2, 1.3)
     foreAngle = 22.0 to 52.0 with gaussian(37.0, 6.0)
     tornusAngle = -14.0 to 24.0 with gaussian(6.0, 7.0)
@@ -219,7 +219,7 @@ asset ButterflyWing {
     abdomen = 0.62 to 0.86 with gaussian(0.74, 0.06)
     antenna = 0.38 to 0.62 with gaussian(0.5, 0.06)
     antennaAngle = 55.0 to 80.0
-    stream_pop()
+    stream.pop()
 
     // Styles bend the rolled silhouette, without new draws: swallowtails
     // carry tails, longwings have narrow forewings, blues stay small.
@@ -306,7 +306,7 @@ asset ButterflyWing {
     tailWidth = hind * (0.065 to 0.095)
 
     // ---- colour and pattern: a stream of their own --------------------------
-    stream_push(hash(seed ^ colorKey))
+    stream.push(hash(seed ^ colorKey))
     ground = grounds[look - 1].pick()
     sulphur = sulphurs[index(3)].pick()
     if (look == 4 && chance(0.45)) { ground = sulphur }
@@ -325,7 +325,7 @@ asset ButterflyWing {
     hindRim = foreRim
     rimStroke = 0.0
     veinWidth = fore * (0.008 to 0.014)
-    veinColor = color.set.a(color.mix(rim, deep, 0.3), 120 to 190)
+    veinColor = color.set_a(color.mix(rim, deep, 0.3), 120 to 190)
     basalF = 0.20 to 0.34
     basalAmount = 0.35 to 0.75 with typical
     bandColor = accent
@@ -413,7 +413,7 @@ asset ButterflyWing {
       marginSize = fore * (0.030 to 0.042)
       blueRow = 1
       analEye = 1
-      veinColor = color.set.a(rim, 230)
+      veinColor = color.set_a(rim, 230)
       veinWidth = fore * (0.011 to 0.016)
     } else if (look == 3) {
       // Morpho: electric blue with a sheen, black apex, white apex spots.
@@ -426,13 +426,13 @@ asset ButterflyWing {
       sheenColor = color.mix(ground, #c8f0ff, 0.5)
       outer = color.shade(ground, 18 to 34)
       deep = color.mix(ground, #101a48, 0.35 to 0.65)
-      veinColor = color.set.a(rim, 90 to 150)
+      veinColor = color.set_a(rim, 90 to 150)
       if (rollA < 0.4) { marginRows = 1; marginColor = accent; marginSize = fore * 0.02 }
     } else if (look == 4) {
       // Whites and sulphurs: black or orange tip, a dark spot or two.
       foreRim = 0.0
       hindRim = 0.0
-      veinColor = color.set.a(color.mix(rim, ground, 0.55), 70 to 130)
+      veinColor = color.set_a(color.mix(rim, ground, 0.55), 70 to 130)
       deep = color.mix(ground, #8a8c84, 0.2 to 0.45)
       if (rollA < 0.7) { apexPatch = 0.22 to 0.36 }
       if (rollB < 0.3) {
@@ -506,7 +506,7 @@ asset ButterflyWing {
       marginColor = rim
       checker = 1
       deep = color.mix(ground, #3a3a20, 0.4 to 0.7)
-      veinColor = color.set.a(rim, 150 to 210)
+      veinColor = color.set_a(rim, 150 to 210)
       if (rollA < 0.4) { hindBandLo = 0.45; hindBandHi = 0.58; hindBandColor = color.mix(ground, #f8e8c0, 0.5) }
     } else if (look == 9) {
       // Blue: violet sheen, thin dark rim, white fringe, small black dots.
@@ -521,7 +521,7 @@ asset ButterflyWing {
       if (rollA < 0.6) { marginRows = 1; marginColor = rim; marginSize = fore * 0.026 }
       if (rollB < 0.35) { hindBandLo = 0.80; hindBandHi = 0.90; hindBandColor = accent2 }
       deep = color.mix(ground, #4a4a6a, 0.3 to 0.5)
-      veinColor = color.set.a(rim, 60 to 110)
+      veinColor = color.set_a(rim, 60 to 110)
     } else if (look == 10) {
       // Emerald and birdwing: black with iridescent green.
       diag = 1
@@ -550,7 +550,7 @@ asset ButterflyWing {
       rimStroke = fore * (0.05 to 0.08)
       subapical = 3
       subapicalColor = accent
-      veinColor = color.set.a(rim, 160 to 220)
+      veinColor = color.set_a(rim, 160 to 220)
       veinWidth = fore * (0.008 to 0.011)
       fringeLight = color.mix(rim, accent2, 0.5)
       mottle = 0.0
@@ -887,7 +887,7 @@ asset ButterflyWing {
       sheenColor = #ffffff
       sheen = 0.3
     }
-    if (lightVeins == 1) { veinColor = color.set.a(color.mix(outer, #ffffff, 0.6), 200) }
+    if (lightVeins == 1) { veinColor = color.set_a(color.mix(outer, #ffffff, 0.6), 200) }
 
     // ---- the motif's colours: light on a dark wing, deep on a light one ----
     figure = rolledMotif
@@ -909,7 +909,7 @@ asset ButterflyWing {
     hindEdge = color.shade(hindGround, -14)
     if (hindRim > 0.0 || rimStroke > 0.0) { hindEdge = rim }
     detailSeed = hash(seed ^ detailKey)
-    stream_pop()
+    stream.pop()
 
     // ---- painting ------------------------------------------------------------
     // Needs the 5,000,000 fuel budget of iprop 0.7.1: the soft art is blurred
@@ -931,12 +931,12 @@ asset ButterflyWing {
     }
 
     lift = fore * (0.05 to 0.08)
-    veinShade = color.set.a(color.mix(veinColor, deep, 0.3), 38)
-    veinSoft = color.set.a(veinColor, int(float(veinColor.a) * veinFade * 1.1))
+    veinShade = color.set_a(color.mix(veinColor, deep, 0.3), 38)
+    veinSoft = color.set_a(veinColor, int(float(veinColor.a) * veinFade * 1.1))
     // Even the broad black veins of a monarch stay fine lines.
     softVein = min(veinWidth * 1.1, fore * 0.015)
-    veinSharp = color.set.a(veinColor, int(float(veinColor.a) * veinFade * 0.6))
-    cellGlow = color.set.a(color.mix(outer, #fff8e8, 0.35), 30)
+    veinSharp = color.set_a(veinColor, int(float(veinColor.a) * veinFade * 0.6))
+    cellGlow = color.set_a(color.mix(outer, #fff8e8, 0.35), 30)
     foreCell = 0.52 to 0.58
     foreCellLow = 0.42 to 0.48
     hindCell = 0.44 to 0.50
@@ -994,7 +994,7 @@ asset ButterflyWing {
         if (hindDiag == 1) { band(hindLine, hr, hind, 13.0, 66.0, 0.55, diagWidth * 0.8, diagColor) }
         if (rays == 1) { hindRays(hindLine, hr, hind, rayColor) }
         if (spotRows > 0) { spotField(hindLine, hr, hind, hindGaps, spotRows, spotColor, detailSeed ^ hindSpotKey) }
-        if (lines > 0) { wavy(hindLine, hr, 22.0, 60.0, 0.62, hind, color.set.a(rim, 150)) }
+        if (lines > 0) { wavy(hindLine, hr, 22.0, 60.0, 0.62, hind, color.set_a(rim, 150)) }
         if (blueRow == 1) { lunules(hindLine, hr, hindGaps, hindRim, hind, accent2) }
         motifArt(figure, hindLine, hr, hind, hindGaps, 24, 60, detailSeed ^ hindMotifKey, glow, ink)
         // The forewing's soft shadow on the hindwing.
@@ -1020,12 +1020,12 @@ asset ButterflyWing {
         if (diag == 1) { band(foreLine, fr, fore, diagCosta, diagEnd, diagBow, diagWidth, diagColor) }
         if (apexPatch > 0.0) {
           tip = at(foreLine, fr, 24.0, 1.04)
-          dot(tip, fore * apexPatch * 2.25, color.set.a(apexColor, 70))
+          dot(tip, fore * apexPatch * 2.25, color.set_a(apexColor, 70))
           dot(tip, fore * apexPatch * 2.0, apexColor)
         }
         if (spotRows > 0) { spotField(foreLine, fr, fore, foreGaps, spotRows, spotColor, detailSeed ^ foreSpotKey) }
         if (discal > 0) { discalSpots(foreLine, fr, fore, discal, spotColor) }
-        if (lines > 0) { wavy(foreLine, fr, 14.0, 60.0, 0.56, fore, color.set.a(rim, 150)) }
+        if (lines > 0) { wavy(foreLine, fr, 14.0, 60.0, 0.56, fore, color.set_a(rim, 150)) }
         if (subapical > 0) { subapicalSpots(foreLine, fr, fore, subapical, subapicalColor) }
         motifArt(figure, foreLine, fr, fore, foreGaps, 22, 62, detailSeed ^ foreMotifKey, glow, ink)
       }
@@ -1039,7 +1039,7 @@ asset ButterflyWing {
     // across both wings first.
     scales.draw(detailSeed ^ scaleKey, at={0, 0})
     darkScales = scales.outputs.dark
-    scaleShade = color.set.a(color.mix(rim, #000000, 0.5), 34)
+    scaleShade = color.set_a(color.mix(rim, #000000, 0.5), 34)
     if (hindOn) {
     clip(hindOnly) {
       scaleTexture(hindLine, darkScales, scaleShade)
@@ -1311,11 +1311,11 @@ asset ButterflyWing {
         lo: f32, hi: f32, hair: color, basalF: f32, basalAmount: f32, glass: i32, ground: color, key: i32,
         sheen: f32, sheenColor: color, m0: i32, m1: i32, prism: f32) {
     if (glass == 1) {
-      poly(p, color.set.a(ground, 70))
-      poly(sc(p, r, basalF), color.set.a(color.mix(ground, hair, 0.5), 150))
+      poly(p, color.set_a(ground, 70))
+      poly(sc(p, r, basalF), color.set_a(color.mix(ground, hair, 0.5), 150))
       return;
     }
-    stream_push(key)
+    stream.push(key)
     top = 1.0
     if (rimW > 0.0) {
       poly(p, rim)
@@ -1364,14 +1364,14 @@ asset ButterflyWing {
     // Scales blend across colour boundaries: soft strokes along the rim's
     // inner edge and both edges of a band, over the margin only.
     if (rimW > 0.0) {
-      softEdge(sc(p, r, top), m0, m1, max(2.0, rimW * 40.0), color.set.a(rim, 70))
-      softEdge(sc(p, r, top - 0.012), m0, m1, 1.6, color.set.a(rim, 60))
+      softEdge(sc(p, r, top), m0, m1, max(2.0, rimW * 40.0), color.set_a(rim, 70))
+      softEdge(sc(p, r, top - 0.012), m0, m1, 1.6, color.set_a(rim, 60))
     }
     if (hi < 1.0) {
-      softEdge(sc(p, r, hi), m0, m1, 2.6, color.set.a(band, 90))
-      softEdge(sc(p, r, lo), m0, m1, 2.6, color.set.a(band, 70))
+      softEdge(sc(p, r, hi), m0, m1, 2.6, color.set_a(band, 90))
+      softEdge(sc(p, r, lo), m0, m1, 2.6, color.set_a(band, 70))
     }
-    stream_pop()
+    stream.pop()
   }
 
   softEdge(p: list<vec2>, m0: i32, m1: i32, width: f32, c: color) {
@@ -1386,7 +1386,7 @@ asset ButterflyWing {
   // specks. Under the art blur they read as soft multi-octave noise.
   // tones 1 makes them every pastel colour (opal), 2 lights the clouds.
   wingDetail(p: list<vec2>, r: vec2, len: f32, key: i32, mottle: f32, ground: color, tones: i32, cloud: color) {
-    stream_push(key)
+    stream.push(key)
     if (mottle > 0.0) {
       sizes = [0.12, 0.055, 0.022]
       counts = [10, 36, 90]
@@ -1409,16 +1409,16 @@ asset ButterflyWing {
             tone = cloud
             alpha = alpha * 3
           }
-          dot(at(p, r, us[i], fs[i]), len * sizes[s] * (0.6 to 1.3), color.set.a(tone, alpha))
+          dot(at(p, r, us[i], fs[i]), len * sizes[s] * (0.6 to 1.3), color.set_a(tone, alpha))
         }
       }
     }
-    stream_pop()
+    stream.pop()
   }
 
   // Scale texture: hundreds of single-pixel flecks, light and dark.
   grain(p: list<vec2>, r: vec2, len: f32, amount: f32, detail: i32, key: i32) {
-    stream_push(key)
+    stream.push(key)
     batches = 1
     streaks = 180
     if (detail == 1) {
@@ -1434,7 +1434,7 @@ asset ButterflyWing {
       e = at(p, r, u + (-0.4 to 0.4), f + (0.04 to 0.14))
       line(a.x, a.y, e.x, e.y, 1, pick(#0000000e, #ffffff0b))
     }
-    stream_pop()
+    stream.pop()
   }
 
   // The outline's bounding box in whole pixels, clipped to the canvas:
@@ -1465,8 +1465,8 @@ asset ButterflyWing {
       above = (b[1].y - float(y)) / tall - 0.5
       for x in int(b[0].x)..int(b[1].x) {
         n = noise.fbm(float(x) * scale, fy, 3, key) * amount + above * 0.35
-        if (n > 0.0) { pixel(x, y, color.set.a(glow, int(min(n, 1.0) * 70.0))) }
-        else { pixel(x, y, color.set.a(shade, int(min(-n, 1.0) * 80.0))) }
+        if (n > 0.0) { pixel(x, y, color.set_a(glow, int(min(n, 1.0) * 70.0))) }
+        else { pixel(x, y, color.set_a(shade, int(min(-n, 1.0) * 80.0))) }
       }
     }
   }
@@ -1480,8 +1480,8 @@ asset ButterflyWing {
       for x in int(b[0].x)..int(b[1].x) {
         dx = float(x) + 0.5 - r.x
         n = noise.grad(atan2(dy, dx) * len * 0.9, sqrt(dx * dx + dy * dy) * 0.22, key)
-        if (n > 0.18) { pixel(x, y, color.set.a(glow, int((n - 0.18) * 60.0))) }
-        else if (n < -0.18) { pixel(x, y, color.set.a(dark, int((-n - 0.18) * 70.0))) }
+        if (n > 0.18) { pixel(x, y, color.set_a(glow, int((n - 0.18) * 60.0))) }
+        else if (n < -0.18) { pixel(x, y, color.set_a(dark, int((-n - 0.18) * 70.0))) }
       }
     }
   }
@@ -1512,7 +1512,7 @@ asset ButterflyWing {
     d = color.hsv(c, hue, sat, val)
     d = color.mix(d, #ffffff, lift)
     d = color.mix(d, #000000, sink)
-    return color.set.a(d, c.a)
+    return color.set_a(d, c.a)
   }
 
   // A colour from its hue in turns, saturation and value (all 0..1).
@@ -1539,15 +1539,15 @@ asset ButterflyWing {
   // Iridescent glints: bright single scales catching the light (magic),
   // or the stars of a nebula.
   glints(p: list<vec2>, r: vec2, key: i32, c: color, n: i32) {
-    stream_push(key)
+    stream.push(key)
     us = sampler(20.0 to 64.0).pick(n)
     fs = sampler(0.15 to 0.97 with beta(2.0, 1.3)).pick(n)
     for i in 0..n {
       q = at(p, r, us[i], fs[i])
-      pixel(int(q.x), int(q.y), color.set.a(c, 120 to 230))
-      if (chance(0.25)) { dot(q, 1.6, color.set.a(c, 70)) }
+      pixel(int(q.x), int(q.y), color.set_a(c, 120 to 230))
+      if (chance(0.25)) { dot(q, 1.6, color.set_a(c, 70)) }
     }
-    stream_pop()
+    stream.pop()
   }
 
   // Single-pixel scale flecks, light and dark.
@@ -1574,38 +1574,38 @@ asset ButterflyWing {
   light(p: list<vec2>, r: vec2, len: f32, u: f32, c: color) {
     centre = at(p, r, u, 0.55)
     sizes = stepper(len * 0.25 to len * 0.9).pick(4)
-    for i in 0..4 { dot(centre, sizes[3 - i], color.set.a(c, 12)) }
+    for i in 0..4 { dot(centre, sizes[3 - i], color.set_a(c, 12)) }
   }
 
   baseHair(r: vec2, len: f32, hair: color, key: i32) {
-    stream_push(key)
+    stream.push(key)
     for i in 0..26 {
       a = -1.3 to 1.0
       l = len * (0.06 to 0.20)
       d = vec2.rot({1.0, 0.0}, a)
       q = r + d * (len * (0.0 to 0.05))
       e = q + d * l
-      line(q.x, q.y, e.x, e.y, 1, color.set.a(color.shade(hair, -10 to 30), 70 to 150))
+      line(q.x, q.y, e.x, e.y, 1, color.set_a(color.shade(hair, -10 to 30), 70 to 150))
     }
-    stream_pop()
+    stream.pop()
   }
 
   // Long fine hairs along the hindwing's inner margin, beside the abdomen.
   innerHair(p: list<vec2>, r: vec2, len: f32, hair: color, key: i32) {
-    stream_push(key)
+    stream.push(key)
     for i in 0..22 {
       u = 64.0 to 92.0
       q = at(p, r, u, 0.995)
       d = vec2.rot(vec2.normalize(q - r), -0.9 to -0.3)
       line(q.x, q.y, q.x + d.x * len * (0.03 to 0.08), q.y + d.y * len * (0.03 to 0.08), 1,
-           color.set.a(color.mix(hair, #d8d0c0, 0.3), 60 to 130))
+           color.set_a(color.mix(hair, #d8d0c0, 0.3), 60 to 130))
     }
-    stream_pop()
+    stream.pop()
   }
 
   // An AA stroke over the polygon edge, then a short fringe of cilia.
   edging(p: list<vec2>, r: vec2, m0: i32, m1: i32, edge: color, light: color, dark: color, checker: i32, len: f32) {
-    stroke(p, 0.9, color.set.a(edge, 200))
+    stroke(p, 0.9, color.set_a(edge, 200))
     reach = max(1.6, len * 0.02)
     for i in m0..m1 {
       d = vec2.normalize(p[i] - r)
@@ -1614,10 +1614,10 @@ asset ButterflyWing {
       // Cilia: fine translucent hairs, two per outline step.
       a = p[i] + d * 0.3
       b = p[i] + d * reach
-      line(a.x, a.y, b.x, b.y, 1, color.set.a(c, 125))
+      line(a.x, a.y, b.x, b.y, 1, color.set_a(c, 125))
       m = (p[i] + p[i + 1]) * 0.5 + d * 0.3
       e = m + d * (reach * 0.8)
-      line(m.x, m.y, e.x, e.y, 1, color.set.a(c, 90))
+      line(m.x, m.y, e.x, e.y, 1, color.set_a(c, 90))
     }
   }
 
@@ -1625,7 +1625,7 @@ asset ButterflyWing {
     m = (a + b) * 0.5
     n = vec2.normalize({b.y - a.y, a.x - b.x}) * (vec2.len(b - a) * 0.04)
     curve(a, m + n * 0.5, m + n, w * 1.25, c)
-    curve(m + n, m + n * 0.5 + (b - m) * 0.5, b, w, color.set.a(c, c.a * 3 / 4))
+    curve(m + n, m + n * 0.5 + (b - m) * 0.5, b, w, color.set_a(c, c.a * 3 / 4))
   }
 
   foreVeins(p: list<vec2>, r: vec2, cu: f32, cl: f32, w: f32, c: color) {
@@ -1671,7 +1671,7 @@ asset ButterflyWing {
     innerF = 1.0 - max(rimW, 0.06) * 0.72
     for i in 0..list.len(gaps) {
       u = gaps[i]
-      dot(at(p, r, u, outerF), d * 1.6, color.set.a(c, 60))
+      dot(at(p, r, u, outerF), d * 1.6, color.set_a(c, 60))
       blob(at(p, r, u, outerF), d, c, i * 3)
       if (rows > 1) {
         blob(at(p, r, u - 0.8, innerF), d * 0.8, c, i * 3 + 1)
@@ -1688,7 +1688,7 @@ asset ButterflyWing {
       a = at(p, r, u - 1.5, f)
       b = at(p, r, u + 1.5, f)
       m = at(p, r, u, f + 0.03)
-      curve(a, m, b, len * 0.045, color.set.a(c, 110))
+      curve(a, m, b, len * 0.045, color.set_a(c, 110))
       curve(a, m, b, len * 0.026, c)
     }
   }
@@ -1696,7 +1696,7 @@ asset ButterflyWing {
   // A row of light spots across the dark apex (and the glasswing's bar).
   subapicalSpots(p: list<vec2>, r: vec2, len: f32, kind: i32, c: color) {
     if (kind == 3) {
-      dash(at(p, r, 18.0, 0.80), at(p, r, 33.0, 0.80), len * 0.07, color.set.a(c, 230))
+      dash(at(p, r, 18.0, 0.80), at(p, r, 33.0, 0.80), len * 0.07, color.set_a(c, 230))
       return;
     }
     n = 4
@@ -1706,7 +1706,7 @@ asset ButterflyWing {
       f = 0.80 + float(i % 2) * 0.04
       a = at(p, r, us[i], f - 0.03)
       b = at(p, r, us[i], f + 0.04)
-      dash(a, b, len * (0.06 - float(i) * 0.006), color.set.a(c, 70))
+      dash(a, b, len * (0.06 - float(i) * 0.006), color.set_a(c, 70))
       dash(a, b, len * (0.036 - float(i) * 0.004), c)
     }
   }
@@ -1736,7 +1736,7 @@ asset ButterflyWing {
     if (part == 0) {
       radii = stepper(s * 1.15 to s * 2.0).pick(5)
       tones = stepper(color.mix(ring, dark, 0.6) to color.shade(ring, 18)).pick(5)
-      curve(c - e, c, c + e, s * 2.4, color.set.a(dark, 160))
+      curve(c - e, c, c + e, s * 2.4, color.set_a(dark, 160))
       for i in 0..5 { curve(c - e, c, c + e, radii[4 - i], tones[i]) }
       curve(c - e, c, c + e, s * 1.15, dark)
       curve(c, c + e, c + e * 1.6, s * 0.7, color.mix(pupil, dark, 0.45))
@@ -1771,7 +1771,7 @@ asset ButterflyWing {
 
   // Tiger stripes running back from the costa, shortening towards the apex.
   tigerStripes(p: list<vec2>, r: vec2, len: f32, count: i32, c: color, key: i32) {
-    stream_push(key)
+    stream.push(key)
     starts = stepper(4.0 to 19.0).pick(count)
     for i in 0..count {
       u = starts[i] + (-0.8 to 0.8)
@@ -1780,10 +1780,10 @@ asset ButterflyWing {
       b = at(p, r, 90.0 - float(i) * (6.0 to 8.0), reach)
       m = (a + b) * 0.5 + (r - (a + b) * 0.5) * (0.0 to 0.12)
       w = len * (0.055 to 0.09)
-      curve(a, m, b, w * 1.3, color.set.a(c, 80))
+      curve(a, m, b, w * 1.3, color.set_a(c, 80))
       curve(a, m, b, w, c)
     }
-    stream_pop()
+    stream.pop()
   }
 
   // A broad band across the wing from the costa towards the tornus, bowed
@@ -1792,7 +1792,7 @@ asset ButterflyWing {
     a = at(p, r, uc, 1.06)
     b = at(p, r, ut, 1.06)
     m = at(p, r, (uc + ut) * 0.5, bow)
-    if (width < len * 0.15) { curve(a, m, b, width * 1.25, color.set.a(c, 90)) }
+    if (width < len * 0.15) { curve(a, m, b, width * 1.25, color.set_a(c, 90)) }
     curve(a, m, b, width, c)
   }
 
@@ -1800,13 +1800,13 @@ asset ButterflyWing {
   hindRays(p: list<vec2>, r: vec2, len: f32, c: color) {
     for i in 0..6 {
       u = 28.0 + float(i) * 5.5
-      curve(at(p, r, u, 0.42), at(p, r, u, 0.65), at(p, r, u, 0.9), len * 0.05, color.set.a(c, 170))
+      curve(at(p, r, u, 0.42), at(p, r, u, 0.65), at(p, r, u, 0.9), len * 0.05, color.set_a(c, 170))
     }
   }
 
   // Rows of dark spots and chevrons between the veins (fritillaries).
   spotField(p: list<vec2>, r: vec2, len: f32, gaps: list<f32>, rows: i32, c: color, key: i32) {
-    stream_push(key)
+    stream.push(key)
     levels = stepper(0.42 to 0.86).pick(rows)
     for k in 0..rows {
       for i in 0..list.len(gaps) {
@@ -1818,18 +1818,18 @@ asset ButterflyWing {
             curve(w, q + (q - (w + e) * 0.5) * 0.6, e, len * 0.018, c)
           } else {
             s = len * (0.022 to 0.04)
-            dot(q, s * 1.7, color.set.a(c, 55))
+            dot(q, s * 1.7, color.set_a(c, 55))
             blob(q, s, c, k * 11 + i)
           }
         }
       }
     }
-    stream_pop()
+    stream.pop()
   }
 
   // Bars and spots in and at the end of the discal cell.
   discalSpots(p: list<vec2>, r: vec2, len: f32, count: i32, c: color) {
-    dot(at(p, r, 38.0, 0.56), len * 0.09, color.set.a(c, 60))
+    dot(at(p, r, 38.0, 0.56), len * 0.09, color.set_a(c, 60))
     blob(at(p, r, 38.0, 0.56), len * 0.055, c, 5)
     if (count > 1) { blob(at(p, r, 48.0, 0.64), len * 0.045, c, 9) }
     if (count > 2) {
@@ -1855,22 +1855,22 @@ asset ButterflyWing {
   // The motif's soft share, painted into the art before the blur.
   motifArt(figure: i32, p: list<vec2>, r: vec2, len: f32, gaps: list<f32>, m0: i32, m1: i32,
            key: i32, glow: color, ink: color) {
-    if (figure == 2) { ripples(p, r, key, color.set.a(glow, 120), color.set.a(ink, 80), 2.2) }
-    else if (figure == 3) { marble(p, len, key, color.set.a(glow, 230), color.set.a(ink, 170)) }
-    else if (figure == 4) { lace(p, r, gaps, len, m0, m1, 2.2, color.set.a(glow, 90)) }
+    if (figure == 2) { ripples(p, r, key, color.set_a(glow, 120), color.set_a(ink, 80), 2.2) }
+    else if (figure == 3) { marble(p, len, key, color.set_a(glow, 230), color.set_a(ink, 170)) }
+    else if (figure == 4) { lace(p, r, gaps, len, m0, m1, 2.2, color.set_a(glow, 90)) }
     else if (figure == 6) { orbs(p, r, gaps, len, key, glow, ink, 0) }
-    else if (figure == 7) { sunburst(p, r, gaps, color.set.a(glow, 130), color.set.a(ink, 85)) }
+    else if (figure == 7) { sunburst(p, r, gaps, color.set_a(glow, 130), color.set_a(ink, 85)) }
     else if (figure == 8) { shimmer(p, r, len, key, 72) }
-    else if (figure == 9) { pearls(p, r, len, m0, m1, 1.8, color.set.a(glow, 80)) }
-    else if (figure == 10) { marbleVeins(p, len, key, color.set.a(glow, 230), color.set.a(ink, 170)) }
+    else if (figure == 9) { pearls(p, r, len, m0, m1, 1.8, color.set_a(glow, 80)) }
+    else if (figure == 10) { marbleVeins(p, len, key, color.set_a(glow, 230), color.set_a(ink, 170)) }
   }
 
   // The motif's crisp share, painted over the scales. The single program
   // leaves the ripples soft.
   motifSharp(figure: i32, p: list<vec2>, r: vec2, len: f32, gaps: list<f32>, m0: i32, m1: i32,
              key: i32, glow: color, ink: color, detail: i32) {
-    if (figure == 2 && detail == 1) { ripples(p, r, key, color.set.a(glow, 80), color.set.a(ink, 50), 0.8) }
-    else if (figure == 4) { lace(p, r, gaps, len, m0, m1, 1.0, color.set.a(glow, 245)) }
+    if (figure == 2 && detail == 1) { ripples(p, r, key, color.set_a(glow, 80), color.set_a(ink, 50), 0.8) }
+    else if (figure == 4) { lace(p, r, gaps, len, m0, m1, 1.0, color.set_a(glow, 245)) }
     else if (figure == 5) { stardust(p, r, len, key, glow) }
     else if (figure == 6) { orbs(p, r, gaps, len, key, glow, ink, 1) }
     else if (figure == 9) { pearls(p, r, len, m0, m1, 1.0, glow) }
@@ -1878,7 +1878,7 @@ asset ButterflyWing {
 
   // Agate ripples: rings of the outline, wobbled, alternately pale and dark.
   ripples(p: list<vec2>, r: vec2, key: i32, pale: color, dark: color, width: f32) {
-    stream_push(key)
+    stream.push(key)
     n = 5 to 9
     fs = stepper(0.26 to 0.93).pick(n)
     wave = waves(float(key & 255) + 11.0)
@@ -1887,7 +1887,7 @@ asset ButterflyWing {
       if (i % 2 == 1) { c = dark }
       wideStroke(scw(p, r, fs[i] + (-0.02 to 0.02), 0.06, wave), width * (0.7 to 1.3), c)
     }
-    stream_pop()
+    stream.pop()
   }
 
   // Marbling: thin stripes of domain-warped noise, pale veins and dark ones.
@@ -1898,9 +1898,9 @@ asset ButterflyWing {
       fy = float(y) * s
       for x in int(b[0].x)..int(b[1].x) {
         fx = float(x) * s
-        v = sin((warp(fx, fy, 2.2, key) * 2.6 + fx * 0.5 + fy * 0.3) * 6.2831853)
-        if (v > 0.6) { pixel(x, y, color.set.a(pale, int((v - 0.6) * 2.5 * float(pale.a)))) }
-        else if (v < -0.75) { pixel(x, y, color.set.a(dark, int((-v - 0.75) * 4.0 * float(dark.a)))) }
+        v = sin((noise.warp(fx, fy, 2.2, key) * 2.6 + fx * 0.5 + fy * 0.3) * 6.2831853)
+        if (v > 0.6) { pixel(x, y, color.set_a(pale, int((v - 0.6) * 2.5 * float(pale.a)))) }
+        else if (v < -0.75) { pixel(x, y, color.set_a(dark, int((-v - 0.75) * 4.0 * float(dark.a)))) }
       }
     }
   }
@@ -1935,19 +1935,19 @@ asset ButterflyWing {
   // Stardust: stars of every size, the largest with four rays, and one
   // small constellation.
   stardust(p: list<vec2>, r: vec2, len: f32, key: i32, c: color) {
-    stream_push(key)
+    stream.push(key)
     n = 30 to 50
     us = sampler(21.0 to 63.0).pick(n)
     fs = sampler(0.2 to 0.95 with beta(2.0, 1.4)).pick(n)
     for i in 0..n {
       q = at(p, r, us[i], fs[i])
       s = 0.8 to 2.8 with beta(1.2, 3.0, 0.8, 2.8)
-      dot(q, s * 3.4, color.set.a(c, 40))
+      dot(q, s * 3.4, color.set_a(c, 40))
       dot(q, s, c)
       if (s > 1.6) {
         reach = s * 2.8
-        line(q.x - reach, q.y, q.x + reach, q.y, 1, color.set.a(c, 110))
-        line(q.x, q.y - reach, q.x, q.y + reach, 1, color.set.a(c, 110))
+        line(q.x - reach, q.y, q.x + reach, q.y, 1, color.set_a(c, 110))
+        line(q.x, q.y - reach, q.x, q.y + reach, 1, color.set_a(c, 110))
       }
     }
     u = 26.0 to 56.0
@@ -1957,38 +1957,38 @@ asset ButterflyWing {
       u = clamp(u + (-4.0 to 4.0), 21.0, 63.0)
       f = clamp(f + (-0.12 to 0.12), 0.25, 0.92)
       q = at(p, r, u, f)
-      line(prev.x, prev.y, q.x, q.y, 1, color.set.a(c, 70))
-      dot(q, 5.0, color.set.a(c, 40))
-      dot(q, 1.8, color.set.a(c, 240))
+      line(prev.x, prev.y, q.x, q.y, 1, color.set_a(c, 70))
+      dot(q, 5.0, color.set_a(c, 40))
+      dot(q, 1.8, color.set_a(c, 240))
       prev = q
     }
-    stream_pop()
+    stream.pop()
   }
 
   // Orbs: translucent bubbles in the cells; part 0 their soft glow, part 1
   // the bubble with its lit rim and highlight.
   orbs(p: list<vec2>, r: vec2, gaps: list<f32>, len: f32, key: i32, a: color, b: color, part: i32) {
-    stream_push(key)
+    stream.push(key)
     for i in 0..list.len(gaps) {
       show = chance(0.75)
       q = at(p, r, gaps[i] + (-0.6 to 0.6), 0.42 to 0.86)
       s = len * (0.08 to 0.15)
       c = a
       if (chance(0.4)) { c = b }
-      if (show == 1 && part == 0) { dot(q, s * 1.5, color.set.a(c, 80)) }
+      if (show == 1 && part == 0) { dot(q, s * 1.5, color.set_a(c, 80)) }
       if (show == 1 && part == 1) {
-        dot(q, s, color.set.a(c, 120))
-        dot(q, s * 0.8, color.set.a(color.mix(c, #ffffff, 0.35), 70))
+        dot(q, s, color.set_a(c, 120))
+        dot(q, s * 0.8, color.set_a(color.mix(c, #ffffff, 0.35), 70))
         dot(q + {-s * 0.16, -s * 0.18}, s * 0.26, #ffffffa0)
       }
     }
-    stream_pop()
+    stream.pop()
   }
 
   // Tongues of flame licking out along every cell, a white-hot line in each
   // (with detail).
   flames(p: list<vec2>, r: vec2, gaps: list<f32>, len: f32, key: i32, c: color, detail: i32) {
-    stream_push(key)
+    stream.push(key)
     for i in 0..list.len(gaps) {
       g = gaps[i] + (-0.5 to 0.5)
       sway = 0.6 to 1.4
@@ -2000,14 +2000,14 @@ asset ButterflyWing {
       n = at(p, r, g, 0.68 to 0.74)
       q = at(p, r, g - sway, 0.84)
       e = at(p, r, g + sway * 0.4, 0.95 to 1.03)
-      curve(a, m, n, w, color.set.a(c, 110))
-      curve(n, q, e, w * 0.55, color.set.a(c, 120))
+      curve(a, m, n, w, color.set_a(c, 110))
+      curve(n, q, e, w * 0.55, color.set_a(c, 120))
       if (detail == 1) {
-        curve(a, m, n, w * 0.45, color.set.a(color.mix(c, #ffffff, 0.5), 140))
-        curve(n, q, e, w * 0.25, color.set.a(color.mix(c, #ffffff, 0.5), 150))
+        curve(a, m, n, w * 0.45, color.set_a(color.mix(c, #ffffff, 0.5), 140))
+        curve(n, q, e, w * 0.25, color.set_a(color.mix(c, #ffffff, 0.5), 150))
       }
     }
-    stream_pop()
+    stream.pop()
   }
 
   // Sunburst: soft rays from the root, one along every cell.
@@ -2034,7 +2034,7 @@ asset ButterflyWing {
         dx = float(x) + 1.0 - r.x
         h = turn + atan2(dy, dx) * 0.4 + sqrt(dx * dx + dy * dy) / len * 1.2
             + noise.grad(float(x) * 0.06, float(y) * 0.06, key) * 0.2
-        rect(x, y, 2, 2, color.set.a(hsvColor(h, 0.6, 1.0), alpha))
+        rect(x, y, 2, 2, color.set_a(hsvColor(h, 0.6, 1.0), alpha))
       }
     }
   }
@@ -2066,7 +2066,7 @@ asset ButterflyWing {
       for i in 1..9 {
         t = float(i) / 10.0
         q = base * ((1.0 - t) * (1.0 - t)) + bend * (2.0 * t * (1.0 - t)) + end * (t * t)
-        dot(q, max(0.8, fore * 0.008), color.set.a(#f0ece0, 150))
+        dot(q, max(0.8, fore * 0.008), color.set_a(#f0ece0, 150))
       }
     }
     club = end - d * (len * 0.16)

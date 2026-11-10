@@ -53,11 +53,11 @@ asset Spruce {
     kink = hash(seed ^ kinkKey)
     look = clamp(kind, 0, 5)
     if (look == 0) {
-      stream_push(looks)
+      stream.push(looks)
       look = 1 to 5 with kinds
-      stream_pop()
+      stream.pop()
     }
-    stream_push(colours)
+    stream.push(colours)
     bark = wood.Bark()
     green = wood.Needles()
     cone = wood.Cone()
@@ -65,12 +65,12 @@ asset Spruce {
     barkTint = barks[clamp(barkKind - 2, 0, 1)].pick()
     family = 1 to 4 with greens
     hue = hues[clamp(family - 2, 0, 2)].pick()
-    stream_pop()
+    stream.pop()
     if (barkKind > 1) { bark = wood.Bark(base = barkTint) }
     if (family > 1) { green = wood.Needles(base = hue) }
-    if (needles.a > 0) { green = wood.Needles(base = color.set.a(needles, 255)) }
+    if (needles.a > 0) { green = wood.Needles(base = color.set_a(needles, 255)) }
 
-    stream_push(shape)
+    stream.push(shape)
     size = 0.0 to 1.0 with typical
     girth = 0.0 to 1.0 with typical
     wide = 0.0 to 1.0 with typical
@@ -279,7 +279,7 @@ asset Spruce {
       leader(tip, shoot, -1.5708, green)
       if (split) { leader(tip + {0.0, shoot * 0.6}, shoot * 0.8, -1.5708 + lean2, green) }
     }
-    stream_pop()
+    stream.pop()
   }
 
   // The trunk in the tone of `mode`: two roots flaring along the ground
@@ -304,7 +304,7 @@ asset Spruce {
   // The trunk's centre at height t, 0 at the ground and 1 at the top: it
   // leans most low down, straightening as it rises, with a slight wobble.
   trunkAt(t: f32, x0: f32, leanPx: f32, height: f32, kink: i32) -> vec2 {
-    return {x0 + leanPx * sin(t * 1.5708) + 3.0 * (noise(t * 3.0, 0.5, kink) - 0.5), 124.0 - t * height}
+    return {x0 + leanPx * sin(t * 1.5708) + 3.0 * (noise.value(t * 3.0, 0.5, kink) - 0.5), 124.0 - t * height}
   }
 
   // The trunk's width at height t: it narrows evenly to the top and flares
@@ -341,8 +341,8 @@ asset Spruce {
       }
       d = abs(s) / w
       if (d < 1.0) {
-        upperEdge = top + hangAt(d, droop, thick, curl) + (noise(fx * 0.8, top * 0.37, grain) - 0.5) * 1.8
-        depth = depthAt(d, thick) * (0.75 + 0.5 * noise(fx * 0.75, top * 0.37 + 9.0, grain))
+        upperEdge = top + hangAt(d, droop, thick, curl) + (noise.value(fx * 0.8, top * 0.37, grain) - 0.5) * 1.8
+        depth = depthAt(d, thick) * (0.75 + 0.5 * noise.value(fx * 0.75, top * 0.37 + 9.0, grain))
         light = lift + 0.7 - 0.3 * s / span
         y0 = int(ceil(upperEdge - 0.5))
         y1 = int(ceil(upperEdge + depth - 0.5))
@@ -352,7 +352,7 @@ asset Spruce {
           tone = -1
           if (y < y1) {
             fy = float(y) + 0.5
-            needle = noise((fx - out * 0.6 * fy) * 0.8, fy * 0.25, grain ^ 0x3d)
+            needle = noise.value((fx - out * 0.6 * fy) * 0.8, fy * 0.25, grain ^ 0x3d)
             t = light - 1.6 * (fy - upperEdge) / depth + (needle - 0.5) * 0.8
             tone = 0
             if (t > 0.85) { tone = 4 } else if (t > 0.42) { tone = 3 } else if (t > 0.02) { tone = 2 } else if (t > -0.45) { tone = 1 }

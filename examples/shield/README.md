@@ -91,7 +91,7 @@ inputs in saves, not the picture. Render at 48x48 and scale with nearest neighbo
 `examples/shield/shield.iprop`, the compiled asset for the game.
 
 ```sh
-SDK=~/.cache/iprop-asset/sdk/0.9.0
+SDK=~/.cache/iprop-asset/sdk/1.0.0
 # ipgen's JSON cannot hold the shards: --omit-part-outputs renders the image and the other outputs.
 "$SDK/bin/ipgen" examples/shield/shield.iprop --seed 7 --omit-part-outputs -o shield-7.png
 "$SDK/bin/ipgen" examples/shield/shield.iprop --seed 7 --omit-part-outputs --uniform paint=#2e6db0 -o blue-team.png
@@ -126,9 +126,9 @@ node scripts/sheet.mjs examples/shield/shield.ips --sweep paint=#b03a2e,#2e6db0,
 node scripts/sheet.mjs examples/shield/shield.ips --sweep damage=0,1,2 --seeds 1-8
 ```
 
-With Infinite Props 0.9, seeds 1-1000 all render, all differ; fuel mean about 129,000, peak
-242,836 (5% of 5,000,000) at seed 117, a kite whose emblem takes four passes. Shattered, the mean
-is about 198,000 and the peak 312,649 at the same seed. (0.8 counted fuel by an older tariff: mean
+With Infinite Props 1.0, seeds 1-1000 all render, all differ; fuel mean about 129,000, peak
+242,370 (1% of 25,000,000) at seed 117, a kite whose emblem takes four passes. Shattered, the mean
+is about 198,000 and the peak 312,161 at the same seed. (0.8 counted fuel by an older tariff: mean
 about 243,000, peak 417,272.) The check names `shards` but cannot read it; the Python lines above
 can. `seeds.txt` holds the seeds to compare across revisions: one of every family and emblem
 design, the heaviest ones and those that once looked wrong.

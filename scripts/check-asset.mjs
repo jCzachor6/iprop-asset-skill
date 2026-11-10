@@ -76,6 +76,13 @@ const newer = sources.files.filter((file) => NEWER.test(file.content.replace(/\/
 if (newer.length && !versionAtLeast(sdk.version, "0.9.0")) {
   report.checks.push(result("error", "version", `${names(newer)} ${newer.length === 1 ? "uses" : "use"} noise masks, geometry or dynamic parts, which need Infinite Props 0.9.0 or newer; this SDK is ${sdk.version}`))
 }
+// The 1.0 spellings are unknown names to an older compiler too. The other way round needs no help:
+// a 1.0 compiler names the replacement of every 0.9 spelling in its own diagnostic.
+const RENAMED = /\b(?:stream\.(?:push|pop)|noise\.(?:value|fault|warp)|vec2\.(?:fold|polar)|dist\.fill|color\.set_a)\s*\(/
+const renamed = sources.files.filter((file) => RENAMED.test(file.content.replace(/\/\/.*$/gm, "")))
+if (renamed.length && !versionAtLeast(sdk.version, "1.0.0")) {
+  report.checks.push(result("error", "version", `${names(renamed)} ${renamed.length === 1 ? "is" : "are"} written in the 1.0 language (stream.push, noise.value, color.set_a and the like), which needs Infinite Props 1.0.0 or newer; this SDK is ${sdk.version}`))
+}
 if (!sources.entries.length) report.checks.push(result("error", "entry", "no asset entry: every .ips here is imported by another file or is a material library"))
 
 // Compile checks: each entry with everything it imports, plus libraries no entry reaches.

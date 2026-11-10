@@ -167,7 +167,7 @@ emission maps. Peasant swords output four zeros.
 From the skill folder, with the SDK that `node scripts/sdk.mjs` prints:
 
 ```sh
-SDK=~/.cache/iprop-asset/sdk/0.9.0
+SDK=~/.cache/iprop-asset/sdk/1.0.0
 mkdir -p out/sword
 "$SDK/bin/ipc" examples/sword/sword.ips -o out/sword/sword.iprop
 "$SDK/bin/ipval" out/sword/sword.iprop

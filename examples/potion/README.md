@@ -65,8 +65,8 @@ node scripts/sheet.mjs examples/potion/potion.ips --sweep style=1,2,3 --seeds 1-
 node scripts/sheet.mjs examples/potion/potion.ips --sweep fill=1,3,5 --seeds 1-8 --outputs
 ```
 
-With Infinite Props 0.9, fuel stays near 335,000 on average and under 530,000 over seeds 1-200 (the
-crackle's noise mask over the 64x64 canvas adds about 52,000 where it appears; 0.8's older tariff
-gave about 370,000 and 520,000). The
+With Infinite Props 1.0, fuel stays near 317,000 on average and under 510,000 over seeds 1-200 (the
+crackle's noise mask over the 64x64 canvas adds about 52,000 where it appears; 0.9 gave about
+335,000 and 530,000 for the same pixels, before the compiler emitted cheaper loops). The
 vessel fills its body pixel by pixel from a signed distance, because every pixel's tone depends on
 where it sits in the glass; everything else is drawn as rows, lines and shapes.

@@ -30,16 +30,18 @@ How it is built:
   follow, so a forced scheme keeps the seed's wings.
 - **Textures as masks.** `scales.ips` exports a mask once; the wing tiles it with `mask.offset`
   instead of drawing every scale.
-- **Budget.** Detail costs fuel: with Infinite Props 0.9 the single-program butterfly spends about
-  2.9 million on average (up to about 3.6 million of 5 million over seeds 1-200; 0.8's older tariff
-  charged about 3.9 and 4.4 million). With `which = 1/2` and `detail = 1` each wing becomes a
-  program of its own with a whole budget, and a host composes them.
-- **A cheaper relative (0.9).** The marble and shimmer motifs are pixel loops that need a wing
-  program's budget, so the single program draws a relative instead. Marble used to fall back to
-  ripples; now it is painted as marble from two ridge `noise.mask`es with soft edges (`marbleVeins`:
-  warped pale veins and fainter dark ones without the costly warp), for about 0.4 million fuel for
-  both sides. Marble forced on every seed peaks at about 4.0 million (81%). The wing programs keep
-  the loop; shimmer still falls back to a sunburst.
+- **Budget.** Detail costs fuel: with Infinite Props 1.0 the single-program butterfly spends about
+  2.9 million on average and up to about 3.5 million over seeds 1-200. It was built for the
+  5,000,000 a program had before 1.0, where that was up to 71%; of the 25,000,000 of 1.0 it is
+  14%. With `which = 1/2` and `detail = 1` each wing becomes a program of its own (about 2 million
+  on average, 3.1 million at most), and a host composes them.
+- **A cheaper relative (0.9).** The marble and shimmer motifs are pixel loops, too costly to run
+  for both sides in the single program under the budget it was built for, so it draws a relative
+  instead. Marble used to fall back to ripples; now it is painted as marble from two ridge
+  `noise.mask`es with soft edges (`marbleVeins`: warped pale veins and fainter dark ones without
+  the costly warp), for under half a million fuel for both sides. Marble forced on every seed
+  peaks at about 4.0 million. The wing programs keep the loop; shimmer still falls back to a
+  sunburst.
 
 ## Inputs
 
@@ -65,9 +67,9 @@ node scripts/sheet.mjs examples/butterfly/butterfly.ips --sweep scheme=1,3,6,10 
 ```
 
 The wing programs start at the body axis, so they touch their left edge by design: check them with
-`--allow-edge`. With 0.9 the butterfly spends up to about 71% of its fuel on its heaviest seeds
-(under 0.8's tariff it was 88%, which the check reported as a warning); the split wing programs
-exist for that budget.
+`--allow-edge`. Under the 5,000,000 budget of 0.9 the butterfly spent up to about 71% of its fuel
+on its heaviest seeds (under 0.8's tariff it was 88%, which the check reported as a warning); the
+split wing programs exist for that budget. With the 25,000,000 of 1.0 the check reports 14%.
 
 The butterfly predates materials: its colours are gradient palettes indexed by style. Written today,
 a wing look (ground, rim, two accents and hair) could be a material that the scheme overrides.

@@ -79,11 +79,11 @@ asset Tree {
     shape = hash(seed ^ shapeKey)
     look = clamp(kind, 0, 5)
     if (look == 0) {
-      stream_push(hash(seed ^ kindKey))
+      stream.push(hash(seed ^ kindKey))
       look = 1 to 5 with kinds
-      stream_pop()
+      stream.pop()
     }
-    stream_push(hash(seed ^ colorKey))
+    stream.push(hash(seed ^ colorKey))
     bark = wood.Bark()
     leaves = wood.Leaves()
     barkKind = 1 to 5 with barkKinds
@@ -91,21 +91,21 @@ asset Tree {
     season = 1 to 7 with seasons
     hue = foliage[clamp(season - 2, 0, 4)].pick()
     petal = petals[0].pick()
-    stream_pop()
+    stream.pop()
     if (barkKind > 1) { bark = wood.Bark(base = barkTint) }
     if (season >= 2 && season <= 6) { leaves = wood.Leaves(base = hue) }
     // In blossom the lit leaves are petals; the shaded ones stay green.
     if (season == 7) { leaves = wood.Leaves(light = petal, glint = color.mix(petal, #ffffff, 0.6)) }
-    if (leaf.a > 0) { leaves = wood.Leaves(base = color.set.a(leaf, 255)) }
+    if (leaf.a > 0) { leaves = wood.Leaves(base = color.set_a(leaf, 255)) }
 
     // Moss on the lower trunk and roots of some trees, in a stream of its
     // own; its noise mask takes an explicit seed and draws from no stream.
-    stream_push(hash(seed ^ mossKey))
+    stream.push(hash(seed ^ mossKey))
     mossy = chance(0.3)
     mossReach = lerp(16.0, 44.0, 0.0 to 1.0 with typical)
     mossCover = 0.0 to 1.0 with typical
     moss = wood.Moss()
-    stream_pop()
+    stream.pop()
 
     // The ground cuts the trunk and its roots off flat, along the outline's
     // dark edge. The wood is captured once, so the moss can follow its mask.
@@ -140,7 +140,7 @@ asset Tree {
 
   // One walk over the whole tree, painting the tone of `mode`.
   grow(mode: i32, look: i32, s: i32, b: wood.Bark, f: wood.Leaves) {
-    stream_push(s)
+    stream.push(s)
     // Every roll is made up front, whatever the silhouette.
     size = 0.0 to 1.0 with typical
     girth = 0.0 to 1.0 with typical
@@ -365,14 +365,14 @@ asset Tree {
       if (forks > 1) { off = (float(k) / float(forks - 1) - 0.5) * spread }
       limb(mode, p, up + off + (-0.15 to 0.15), topW * (0.7 to 0.9), limbLen * (0.85 to 1.15), min(1.0, limbClump + 0.15), shape, b, f)
     }
-    stream_pop()
+    stream.pop()
   }
 
   // The trunk's direction at height t, 0 at the ground and 1 where it
   // forks: upright at the base, then bending about its lean, with small
   // kinks from a noise of its own.
   trunkAngle(t: f32, lean: f32, bend: f32, waves: f32, phase: f32, kink: i32) -> f32 {
-    return -1.5708 + lean * t + bend * (sin(t * waves * 3.1416 + phase) - sin(phase)) + 0.32 * (noise(t * 4.0, 0.5, kink) - 0.5)
+    return -1.5708 + lean * t + bend * (sin(t * waves * 3.1416 + phase) - sin(phase)) + 0.32 * (noise.value(t * 4.0, 0.5, kink) - 0.5)
   }
 
   // The trunk's width at height t, 0 at the ground and 1 where it forks:
@@ -558,7 +558,7 @@ asset Tree {
   // One clump of leaves: a big core at the back and a few smaller puffs
   // heaped in front of it, each painted over what lies behind.
   clump(at: vec2, r: f32, flat: f32, f: wood.Leaves, cs: i32) {
-    stream_push(cs)
+    stream.push(cs)
     c = {clamp(at.x, r * 1.15 + 1.0, 127.0 - r * 1.15), clamp(at.y, r * flat * 1.2 + 2.0, 112.0)}
     crown = {c.x, c.y, r}
     n = 2 + int(r / 6.0) + (0 to 1)
@@ -578,7 +578,7 @@ asset Tree {
     for k in 0..n {
       puff(c + {ox[k] * r, oy[k] * r * flat}, r * rs[k], flat, c, r, 0.05 * float(k), dense[k], tones, grain)
     }
-    stream_pop()
+    stream.pop()
   }
 
   // A leaf tone drifted towards a clump's own tint and brightness.
@@ -615,9 +615,9 @@ asset Tree {
             q = u * u + vv
             onLeaf = noise.cell(fx * 0.55, fy * 0.55, grain) < dense
             edge = 1.0
-            if (q > 0.65) { edge = 0.9 + (noise(fx * 0.5, fy * 0.5, grain) - 0.5) * 0.4 + 0.3 * onLeaf }
+            if (q > 0.65) { edge = 0.9 + (noise.value(fx * 0.5, fy * 0.5, grain) - 0.5) * 0.4 + 0.3 * onLeaf }
             if (q < edge) {
-              t = 0.3 * sqrt(max(0.0, 1.0 - q)) - 0.25 * u + rowLight + (noise(fx * 0.6, fy * 0.6, grain ^ 0x51) - 0.5) * 0.6
+              t = 0.3 * sqrt(max(0.0, 1.0 - q)) - 0.25 * u + rowLight + (noise.value(fx * 0.6, fy * 0.6, grain ^ 0x51) - 0.5) * 0.6
               tone = 0
               if (onLeaf) {
                 tone = 1
@@ -642,13 +642,13 @@ asset Tree {
   // Leaves on a bare twig's tip: two to four short strokes fanned round
   // the twig's direction.
   sprig(p: vec2, a: f32, f: wood.Leaves, hs: i32) {
-    stream_push(hs)
+    stream.push(hs)
     n = 2 to 4
     for k in 0..n {
       la = a + (-1.0 to 1.0)
       tone = pick(f.base, f.light, f.light, f.shade)
       line(p, p + {cos(la), sin(la)} * (1.6 to 2.8), 1, tone)
     }
-    stream_pop()
+    stream.pop()
   }
 }

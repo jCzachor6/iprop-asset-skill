@@ -84,13 +84,13 @@ asset Potion {
     if (fill == 0) { fillStep = md(hash(start ^ fillKey), 5) }
     look = clamp(style, 1, 3) - 1
     if (style == 0) { look = md(hash(start ^ styleKey), 3) }
-    stream_push(hash(start ^ liquidKey))
+    stream.push(hash(start ^ liquidKey))
     liq = elixirs[index(12)].pick()
-    stream_pop()
+    stream.pop()
     if (liquid.a != 0) { liq = liquid }
 
     // ---- roll the silhouette family and its proportions ----------------
-    stream_push(hash(start ^ silhouetteKey))
+    stream.push(hash(start ^ silhouetteKey))
     fam = 0 to 16
     bFoot = 3.0
 
@@ -194,7 +194,7 @@ asset Potion {
       nBase = bTop + bTW * 0.35
     }
 
-    stream_pop()
+    stream.pop()
 
     // ---- glass tint from the liquid (hue family) -----------------------
     gRel = 0 to 2
@@ -268,7 +268,7 @@ asset Potion {
     else { dRX = 3.0; dRY = 4.4; symJit = 0.0 }
 
     // ---- neck ----------------------------------------------------------
-    stream_push(hash(start ^ neckShapeKey))
+    stream.push(hash(start ^ neckShapeKey))
     nStyle = 0 to 6
     if (nStyle == 0) {
       nH = proportion(3.5, 6.0)
@@ -314,14 +314,14 @@ asset Potion {
 
     corkBase = nBase - nH
     if (corkBase - cH < 3.5) { cH = max(corkBase - 3.5, 2.8); }
-    stream_pop()
+    stream.pop()
 
     // ---- decoration materials, in a stream of their own ---------------
-    stream_push(hash(start ^ decorKey))
+    stream.push(hash(start ^ decorKey))
     paper = mats.Parchment()
     gold = mats.Gold()
     etching = mats.Etching()
-    stream_pop()
+    stream.pop()
 
     // ---- crackle: an old glass's fine fissures, rare; most on arcane ---
     // flasks. A hashed roll of its own, so it moves no other draw.
@@ -366,7 +366,7 @@ asset Potion {
       fissures = noise.mask({0, 0}, {64, 64}, noise.mode_cell_edge, {0.14, 0.14}, 0.08,
                             hash(start ^ fissureKey), octaves = 1, softness = 0.0,
                             comparison = noise.below, warp_amount = 0.3)
-      surface.paint(fissures, color.set.a(#eef8ff, 100), blend = surface.source_over)
+      surface.paint(fissures, color.set_a(#eef8ff, 100), blend = surface.source_over)
     }
     if (bare == 0) {
       if (decoKind == 0) { sticker(labelAt.x, labelAt.y, symS, sym, paper) }
@@ -437,8 +437,8 @@ asset Potion {
     rect(ox - w, y0, w * 2.0, 0.9, g.light)
     rect(ox - w, y0 + 2.0, w * 2.0, 0.5, g.deep)
     if (w > 6.0) {
-      poly(g.glint, ox - w + 2.4, oy, ox - w + 3.6, oy - 1.6, ox - w + 4.8, oy, ox - w + 3.6, oy + 1.6)
-      poly(g.glint, ox + w - 2.4, oy, ox + w - 3.6, oy - 1.6, ox + w - 4.8, oy, ox + w - 3.6, oy + 1.6)
+      poly(ox - w + 2.4, oy, ox - w + 3.6, oy - 1.6, ox - w + 4.8, oy, ox - w + 3.6, oy + 1.6, g.glint)
+      poly(ox + w - 2.4, oy, ox + w - 3.6, oy - 1.6, ox + w - 4.8, oy, ox + w - 3.6, oy + 1.6, g.glint)
     }
   }
 
@@ -458,7 +458,7 @@ asset Potion {
     for i in 0..n {
       gx = ox + (-1.0 to 1.0) * max(w - 1.2, 0.5)
       gy = oy + (-1.0 to 1.0) * 3.3
-      poly(g.light, gx, gy - 1.1, gx + 1.1, gy, gx, gy + 1.1, gx - 1.1, gy)
+      poly(gx, gy - 1.1, gx + 1.1, gy, gx, gy + 1.1, gx - 1.1, gy, g.light)
     }
   }
 
@@ -466,10 +466,10 @@ asset Potion {
   //          7 heart, 8 bolt, 9 eye, 10 mushroom. `bg` fills the cutouts.
   decoSymbol(sx: f32, sy: f32, s: f32, sym: i32, c: color, bg: color) {
     if (sym == 0) {
-      poly(c, sx, sy - s, sx + s * 0.3, sy, sx, sy + s, sx - s * 0.3, sy)
-      poly(c, sx - s, sy, sx, sy - s * 0.3, sx + s, sy, sx, sy + s * 0.3)
+      poly(sx, sy - s, sx + s * 0.3, sy, sx, sy + s, sx - s * 0.3, sy, c)
+      poly(sx - s, sy, sx, sy - s * 0.3, sx + s, sy, sx, sy + s * 0.3, c)
     } else if (sym == 1) {
-      poly(c, sx, sy - s, sx + s * 0.68, sy + s * 0.12, sx - s * 0.68, sy + s * 0.12)
+      poly(sx, sy - s, sx + s * 0.68, sy + s * 0.12, sx - s * 0.68, sy + s * 0.12, c)
       oval(sx, sy + s * 0.28, s * 0.68, s * 0.68, c)
     } else if (sym == 2) {
       oval(sx, sy - s * 0.2, s * 0.72, s * 0.66, c)
@@ -481,7 +481,7 @@ asset Potion {
       oval(sx, sy, s * 0.85, s * 0.85, c)
       oval(sx + s * 0.38, sy - s * 0.18, s * 0.68, s * 0.68, bg)
     } else if (sym == 4) {
-      poly(c, sx, sy - s, sx + s * 0.62, sy, sx, sy + s, sx - s * 0.62, sy)
+      poly(sx, sy - s, sx + s * 0.62, sy, sx, sy + s, sx - s * 0.62, sy, c)
       line(sx, sy + s * 0.7, sx + s * 0.3, sy + s * 1.25, 1, c)
     } else if (sym == 5) {
       line(sx, sy - s * 0.9, sx, sy + s * 0.9, 1, c)
@@ -493,10 +493,10 @@ asset Potion {
     } else if (sym == 7) {
       oval(sx - s * 0.36, sy - s * 0.3, s * 0.5, s * 0.5, c)
       oval(sx + s * 0.36, sy - s * 0.3, s * 0.5, s * 0.5, c)
-      poly(c, sx - s * 0.86, sy - s * 0.16, sx + s * 0.86, sy - s * 0.16, sx, sy + s * 0.88)
+      poly(sx - s * 0.86, sy - s * 0.16, sx + s * 0.86, sy - s * 0.16, sx, sy + s * 0.88, c)
     } else if (sym == 8) {
-      poly(c, sx + s * 0.15, sy - s, sx - s * 0.5, sy + s * 0.12, sx - s * 0.08, sy + s * 0.12,
-           sx - s * 0.25, sy + s, sx + s * 0.5, sy - s * 0.15, sx + s * 0.05, sy - s * 0.15)
+      poly(sx + s * 0.15, sy - s, sx - s * 0.5, sy + s * 0.12, sx - s * 0.08, sy + s * 0.12,
+           sx - s * 0.25, sy + s, sx + s * 0.5, sy - s * 0.15, sx + s * 0.05, sy - s * 0.15, c)
     } else if (sym == 9) {
       oval(sx, sy, s * 0.95, s * 0.62, c)
       oval(sx, sy, s * 0.45, s * 0.45, bg)

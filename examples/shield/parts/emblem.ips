@@ -48,8 +48,8 @@ asset ShieldEmblem {
     } else if (kind == 3) {
       apex = round(cy - bossR - lerp(3.0, 6.0, reach))   // above the boss
       thick = float(b) * 1.4
-      poly(ink, cx, apex, cx + far, apex + far, cx + far, apex + far + thick,
-           cx, apex + thick, cx - far, apex + far + thick, cx - far, apex + far)
+      poly(cx, apex, cx + far, apex + far, cx + far, apex + far + thick,
+           cx, apex + thick, cx - far, apex + far + thick, cx - far, apex + far, ink)
     } else if (kind == 4) {
       if (flip) { rect(0.0, 0.0, cx, 48.0, ink) } else { rect(cx, 0.0, 48.0 - cx, 48.0, ink) }
     } else if (kind == 5) {
@@ -75,7 +75,7 @@ asset ShieldEmblem {
     } else if (kind == 11) {
       hx = round(half * lerp(0.6, 0.8, reach))
       hy = round(tall * lerp(0.36, 0.46, reach))
-      poly(ink, cx, cy - hy, cx + hx, cy, cx, cy + hy, cx - hx, cy)
+      poly(cx, cy - hy, cx + hx, cy, cx, cy + hy, cx - hx, cy, ink)
     } else if (kind == 12) {
       rect(0.0, 0.0, 48.0, float(round(top + tall * lerp(0.26, 0.36, band))), ink)
     } else {
@@ -86,8 +86,8 @@ asset ShieldEmblem {
   // A band through (px, py) along (1, s), hb pixels to each side of its line.
   diagonal(px: f32, py: f32, hb: f32, s: f32, ink: color) {
     d = hb * 1.41421
-    poly(ink, px - far, py - far * s - d, px + far, py + far * s - d,
-         px + far, py + far * s + d, px - far, py - far * s + d)
+    poly(px - far, py - far * s - d, px + far, py + far * s - d,
+         px + far, py + far * s + d, px - far, py - far * s + d, ink)
   }
 
   // An annulus about (px, py).
@@ -111,7 +111,7 @@ asset ShieldEmblem {
         a1 = a0 + step * share
       }
       if (share < 0.45 || k % 2 == 0) {
-        poly(ink, px, py, px + far * cos(a0), py + far * sin(a0), px + far * cos(a1), py + far * sin(a1))
+        poly(px, py, px + far * cos(a0), py + far * sin(a0), px + far * cos(a1), py + far * sin(a1), ink)
       }
     }
   }

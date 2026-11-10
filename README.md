@@ -2,7 +2,7 @@
 
 A Claude Code skill for creating [Infinite Props](https://infiniteprops.dev) assets: seeded,
 procedural props written as `.ips` recipes and compiled to `.iprop` for games. It teaches the
-language up to 0.9 (materials, steppers, samplers, weighted distributions, layers and masks, noise
+1.0 language (materials, steppers, samplers, weighted distributions, layers and masks, noise
 masks, Voronoi regions with gaps and bevels, dynamic parts), a method for splitting a prop into
 characteristic features that grow new variants and colours, and a check-and-review loop on top of
 the SDK tools.
@@ -28,11 +28,13 @@ procedural prop or sprite generator for a game. `SKILL.md` describes the workflo
 ## Requirements
 
 - Node 20 or newer; the scripts use no packages.
-- The Infinite Props SDK. The scripts download 0.9.0 for macOS arm64, Linux x86_64 or Windows
-  x86_64 into `~/.cache/iprop-asset/sdk/<version>` and check it against the release's SHA-256 sums.
-  `IPROP_SDK` points them at an unpacked SDK instead, `IPROP_VERSION` selects another release and
-  `IPROP_SDK_CACHE` moves the cache. With 0.8.0 the scripts still check assets without the 0.9
-  features.
+- The Infinite Props SDK. The scripts download 1.0.0 for macOS (Apple silicon or Intel), Linux
+  x86_64 or Windows x86_64 into `~/.cache/iprop-asset/sdk/<version>` and check it against the
+  release's SHA-256 sums. `IPROP_SDK` points them at an unpacked SDK instead, `IPROP_VERSION`
+  selects another release and `IPROP_SDK_CACHE` moves the cache. With 0.9.0 or 0.8.0 the scripts
+  still check assets written for those releases; the templates, snippets and examples here use
+  the 1.0 spellings and need 1.0.0. Releases before 1.0.0 have no SDK for Macs with Intel
+  processors.
 
 ## Scripts
 
@@ -63,7 +65,8 @@ asset's header. Renders go to `out/<asset>/` under the current folder.
   with this skill from one prompt. All five name their stream keys (`const i32 shapeKey = ...`).
   For 0.9, four gained a feature built on the new language without moving any other seed: moss on
   the tree, crackled glass on the potion, marble from noise masks on the butterfly, and a cracked
-  and shattered shield whose shards go to the game as dynamic parts.
+  and shattered shield whose shards go to the game as dynamic parts. For 1.0 all five took the new
+  spellings (`stream.push`, `color.set_a`) without moving a pixel.
 - `templates/`: the skeletons `new-asset.mjs` starts from.
 - `scripts/`: the tools and their tests, with lint fixtures in `scripts/test/fixtures/`.
 - `evals/`: test prompts for measuring the skill.
@@ -75,7 +78,8 @@ When an Infinite Props release changes the language, set `DEFAULT_VERSION` in
 `references/language.md`, and run `node --test scripts/test`: it compiles the templates, the
 snippets and the examples with that SDK, checks the shield's part outputs and checks that the lint
 still flags its fixtures. Fuel figures in the READMEs and `references/examples.md` change with the
-fuel tariff, so measure them again with the new SDK.
+fuel tariff and with the code the compiler emits (1.0 kept the tariff and still spends a few
+percent less), so measure them again with the new SDK.
 
 ## License
 

@@ -16,16 +16,20 @@ const VALUED = new Set(["--name", "--size", "--origin", "--features", "--outputs
 const LEVELS = ["low", "medium", "high", "extreme"]
 const RECTS = new Set(["collider", "bounds", "hitbox", "footprint"])
 const args = process.argv.slice(2)
-// Names a template already uses, and words and builtins of the language.
+// Names a template already uses, and words and builtins of the language. In 1.0 an asset's inputs,
+// outputs, palettes, constants, helpers and import aliases share one namespace.
 const RESERVED = [
   "seed", "draw", "at", "size", "origin", "const", "to", "with", "distribution", "sampler", "stepper", "weighted",
   "density", "layer", "mask", "clip", "surface", "material", "input", "output", "import", "palette", "list", "if",
-  "else", "for", "return", "color", "vec2", "hash", "roll", "choose", "pick", "chance", "index", "lerp", "clamp",
+  "else", "for", "return", "asset", "from", "in", "while", "break", "continue", "true", "false",
+  "color", "vec2", "hash", "roll", "choose", "pick", "chance", "index", "lerp", "clamp",
   "min", "max", "abs", "sin", "cos", "float", "int", "rect", "oval", "line", "poly", "dot", "curve",
   "kind", "tint", "typical", "kinds", "cx", "ground", "maxHalf", "maxTall", "start", "look", "half", "tall",
   "kindKey", "shapeKey", "colorKey", "rolledKind",
 ]
-const SINGLE = ["bodies", "families", "lean", "markY", "base", "marked", "tones", "outline", "body", "rows", "toneAt"]
+// The builtin namespaces: a feature becomes an import alias, which cannot take one of their names.
+const NAMESPACES = ["noise", "color", "vec2", "dist", "cell", "stream", "surface", "list", "diagram", "regions", "part", "parts", "voronoi", "contour"]
+const SINGLE = ["bodies", "families", "lean", "markY", "base", "marked", "tones", "outline", "body", "rows", "toneAt", "lightness"]
 const COMPOSED = ["main", "accent", "mount", "looks"]
 const composed = args.includes("--composed")
 const TAKEN = new Set([...RESERVED, ...(composed ? COMPOSED : SINGLE)])
@@ -109,6 +113,8 @@ if (!composed) {
   const names = (feature) => ["", "Key", "Width", "Share", "Half", "Tall"].map((suffix) => camel(feature) + suffix)
   const clash = features.find((feature) => names(feature).some((local) => TAKEN.has(local)) || outputs.some((output) => output.name === camel(feature)))
   if (clash) fail(`--features: "${clash}" is a name the template or an output already uses; call the feature something else`)
+  const namespace = features.find((feature) => NAMESPACES.includes(camel(feature)))
+  if (namespace) fail(`--features: "${namespace}" is a builtin namespace of the language, which an import cannot be called; call the feature something else`)
   // Keys from well-mixed constants of known hashes (MurmurHash3, xxHash, Bob Jenkins, the golden ratio).
   const keys = ["0x85ebca6b", "0xc2b2ae35", "0x27d4eb2f", "0x165667b1", "0xd3a2646c", "0xfd7046c5", "0xb55a4f09", "0x9e3779b9"]
   if (features.length > keys.length) fail(`--features takes up to ${keys.length} features; add more parts by hand, each with a key of its own`)

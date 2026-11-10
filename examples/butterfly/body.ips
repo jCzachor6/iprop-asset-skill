@@ -52,11 +52,11 @@ asset ButterflyBody {
 
   draw {
     look = clamp(int(style), 1, 13)
-    stream_push(hash(seed ^ hairKey))
+    stream.push(hash(seed ^ hairKey))
     coat = recolor(hairs[look - 1].pick(), hue, saturation * 0.8, value, lift * 0.6, sink)
-    stream_pop()
+    stream.pop()
 
-    stream_push(hash(seed ^ bodyKey))
+    stream.push(hash(seed ^ bodyKey))
     distribution typical = gaussian(mean=0.5, sigma=0.18)
     shell = recolor(bodies[look - 1].pick(), hue, saturation, value, lift * 0.6, sink)
     eyeBase = eyeTones[index(3)].pick()
@@ -66,7 +66,7 @@ asset ButterflyBody {
     segments = 8 to 10
     marked = chance(0.6)
     if (look == 1 || look == 2 || look == 7) { marked = 1 }
-    stream_pop()
+    stream.pop()
 
     cx = 20.0
     cy = 36.0
@@ -83,7 +83,7 @@ asset ButterflyBody {
     layer fuzz(alpha=surface.source_over) {
       curve({cx, cy - thH * 0.55}, {cx, cy}, {cx, cy + thH * 0.6}, thW * 1.08, coat)
       curve({cx, abTop}, {cx, abTop + abLen * 0.4}, {cx, abTop + abLen * 0.78}, abW * 0.95,
-            color.set.a(color.mix(coat, shell, 0.6), 190))
+            color.set_a(color.mix(coat, shell, 0.6), 190))
       dot({cx, headY}, headR * 2.3, coat)
       tufts = stepper(color.shade(coat, -12) to light).pick(6)
       strands(cx, cy - thH * 0.1, thW * 0.5, thH * 0.95, 200, tufts, 2.0, 6.0, thoraxTuftKey)
@@ -107,15 +107,15 @@ asset ButterflyBody {
       }
     }
     curve({cx, abTop + abLen * 0.05}, {cx, abTop + abLen * 0.45}, {cx, abTop + abLen * 0.85},
-          max(0.9, abW * 0.16), color.set.a(#ffffff, 30))
+          max(0.9, abW * 0.16), color.set_a(#ffffff, 30))
     for k in 1..segments {
       t = float(k) / float(segments)
       w = girthAt(t) * abW * 0.46
       y = abTop + t * abLen
-      curve({cx - w, y - 0.6}, {cx, y + 0.8}, {cx + w, y - 0.6}, 0.8, color.set.a(color.shade(shell, -24), 70))
+      curve({cx - w, y - 0.6}, {cx, y + 0.8}, {cx + w, y - 0.6}, 0.8, color.set_a(color.shade(shell, -24), 70))
       if (marked == 1) {
-        dot({cx - w * 0.86, y - 1.2}, max(1.0, abW * 0.13), color.set.a(mark, 200))
-        dot({cx + w * 0.86, y - 1.2}, max(1.0, abW * 0.13), color.set.a(mark, 200))
+        dot({cx - w * 0.86, y - 1.2}, max(1.0, abW * 0.13), color.set_a(mark, 200))
+        dot({cx + w * 0.86, y - 1.2}, max(1.0, abW * 0.13), color.set_a(mark, 200))
       }
     }
 
@@ -125,14 +125,14 @@ asset ButterflyBody {
     for i in 0..5 {
       s = sizes[4 - i]
       curve({cx, cy - thH * 0.5 - s * 0.1}, {cx, cy - s * 0.15}, {cx, cy + thH * 0.55 - s * 0.2}, s,
-            color.set.a(shades[i], 120))
+            color.set_a(shades[i], 120))
     }
     hairTones = stepper(color.shade(coat, -20) to color.mix(light, #ffffff, 0.2)).pick(6)
     strands(cx, cy - thH * 0.05, thW * 0.42, thH * 0.85, 120, hairTones, 1.5, 4.0, thoraxHairKey)
     curve({cx - thW * 0.30, cy - thH * 0.72}, {cx, cy - thH * 0.84}, {cx + thW * 0.30, cy - thH * 0.72},
-          max(1.2, thH * 0.22), color.set.a(light, 180))
+          max(1.2, thH * 0.22), color.set_a(light, 180))
     // Tegulae: the hair tufts that cover the wing bases on both sides.
-    tuft = color.set.a(color.mix(coat, light, 0.5), 200)
+    tuft = color.set_a(color.mix(coat, light, 0.5), 200)
     curve({cx - thW * 0.30, cy - thH * 0.45}, {cx - thW * 0.52, cy - thH * 0.1}, {cx - thW * 0.36, cy + thH * 0.3},
           max(1.4, thW * 0.24), tuft)
     curve({cx + thW * 0.30, cy - thH * 0.45}, {cx + thW * 0.52, cy - thH * 0.1}, {cx + thW * 0.36, cy + thH * 0.3},
@@ -142,8 +142,8 @@ asset ButterflyBody {
       dot({cx + thW * 0.22, cy - thH * 0.55}, max(1.0, thH * 0.18), mark)
     }
     if (look == 2) {
-      dash({cx - thW * 0.36, cy - thH * 0.6}, {cx - thW * 0.30, cy + thH * 0.5}, max(1.0, thW * 0.1), color.set.a(mark, 200))
-      dash({cx + thW * 0.36, cy - thH * 0.6}, {cx + thW * 0.30, cy + thH * 0.5}, max(1.0, thW * 0.1), color.set.a(mark, 200))
+      dash({cx - thW * 0.36, cy - thH * 0.6}, {cx - thW * 0.30, cy + thH * 0.5}, max(1.0, thW * 0.1), color.set_a(mark, 200))
+      dash({cx + thW * 0.36, cy - thH * 0.6}, {cx + thW * 0.30, cy + thH * 0.5}, max(1.0, thW * 0.1), color.set_a(mark, 200))
     }
 
     // ---- head: hairy crown, compound eyes with a glint, upturned palps -------
@@ -168,7 +168,7 @@ asset ButterflyBody {
     d = color.hsv(c, hue, sat, val)
     d = color.mix(d, #ffffff, lift)
     d = color.mix(d, #000000, sink)
-    return color.set.a(d, c.a)
+    return color.set_a(d, c.a)
   }
 
   dot(p: vec2, d: f32, c: color) { curve(p, p, p, d, c) }
@@ -177,18 +177,18 @@ asset ButterflyBody {
 
   // Mirrored hair strands around an ellipse of half-sizes rx, ry.
   strands(cx: f32, cy: f32, rx: f32, ry: f32, count: i32, tones: list<color>, shortest: f32, longest: f32, key: i32) {
-    stream_push(key)
+    stream.push(key)
     for i in 0..count {
       a = -3.1416 to 3.1416
       d = {cos(a), sin(a)}
       rim = {d.x * rx, d.y * ry} * (0.55 to 0.95)
       len = shortest to longest with gaussian((shortest + longest) * 0.45, (longest - shortest) * 0.25)
       tip = rim + d * len + {0.0, -0.4 to 0.6}
-      c = color.set.a(tones[index(list.len(tones))], 90 to 210)
+      c = color.set_a(tones[index(list.len(tones))], 90 to 210)
       dash({cx + rim.x, cy + rim.y}, {cx + tip.x, cy + tip.y}, 0.7, c)
       dash({cx - rim.x, cy + rim.y}, {cx - tip.x, cy + tip.y}, 0.7, c)
     }
-    stream_pop()
+    stream.pop()
   }
 
   eye(x: f32, y: f32, r: f32, base: color, side: f32) {

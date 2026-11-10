@@ -285,10 +285,10 @@ asset SwordBlade {
   }
   // These immutable ramps are built once per material in a painting helper.
   scaleSteps(base: color) -> list<color> {
-    return stepper(color.set.a(#000000, base.a) to base).pick(17)
+    return stepper(color.set_a(#000000, base.a) to base).pick(17)
   }
   tintSteps(base: color, target: color) -> list<color> {
-    return stepper(base to color.set.a(target, base.a)).pick(17)
+    return stepper(base to color.set_a(target, base.a)).pick(17)
   }
   lightStep(tones: list<color>, position: f32) -> color {
     return tones[clamp(round(position * 16.0), 0, 16)]

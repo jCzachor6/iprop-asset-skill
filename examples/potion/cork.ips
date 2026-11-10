@@ -57,8 +57,8 @@ asset Cork {
         rect(cx - w - 1.0, base - 4.6, (w + 1.0) * 2.0, 3.2, clothD)
         rect(cx - w - 0.6, base - 4.2, (w + 0.6) * 2.0, 2.4, cloth)
         oval(cx + w + 0.3, base - 3.2, 1.5, 1.5, cloth)
-        poly(clothD, cx + w - 0.5, base - 2.2, cx + w + 2.5, base + 1.6, cx + w + 3.4, base - 0.6)
-        poly(cloth, cx + w - 1.0, base - 1.7, cx + w + 1.4, base + 2.0, cx + w + 2.6, base + 0.4)
+        poly(cx + w - 0.5, base - 2.2, cx + w + 2.5, base + 1.6, cx + w + 3.4, base - 0.6, clothD)
+        poly(cx + w - 1.0, base - 1.7, cx + w + 1.4, base + 2.0, cx + w + 2.6, base + 0.4, cloth)
       }
     } else if (style == 1) {
       waxD = lightStep(liquid_scaleTones, 0.55)
@@ -82,9 +82,9 @@ asset Cork {
       gem = lightStep(liquid_ffffffTones, 0.25)
       gemL = lightStep(liquid_ffffffTones, 0.65)
       gemD = lightStep(liquid_scaleTones, 0.5)
-      poly(gem, cx, top, cx + w, top + h * 0.42, cx, base - 0.5, cx - w, top + h * 0.42)
-      poly(gemL, cx, top + 0.6, cx + w * 0.45, top + h * 0.44, cx, top + h * 0.66)
-      poly(gemD, cx, top + 0.6, cx - w * 0.45, top + h * 0.44, cx, top + h * 0.66)
+      poly(cx, top, cx + w, top + h * 0.42, cx, base - 0.5, cx - w, top + h * 0.42, gem)
+      poly(cx, top + 0.6, cx + w * 0.45, top + h * 0.44, cx, top + h * 0.66, gemL)
+      poly(cx, top + 0.6, cx - w * 0.45, top + h * 0.44, cx, top + h * 0.66, gemD)
     } else if (style == 5) {
       rect(cx - w - 0.6, top - 0.4, (w + 0.6) * 2.0, h + 1.0, flatTones[0])
       rect(cx - w, top, w * 2.0, h, flatTones[2])
@@ -97,7 +97,7 @@ asset Cork {
       oval(cx, top + 0.9, w, 1.6, metalL)
       for i in 0..5 {
         x0 = cx - w + float(i) * (w * 0.4)
-        poly(metalD, x0, base - 1.4, x0 + w * 0.2, base + 1.6, x0 + w * 0.4, base - 1.4)
+        poly(x0, base - 1.4, x0 + w * 0.2, base + 1.6, x0 + w * 0.4, base - 1.4, metalD)
       }
     }
   }
@@ -113,10 +113,10 @@ asset Cork {
   }
   // These immutable ramps are built once per material in a painting helper.
   scaleSteps(base: color) -> list<color> {
-    return stepper(color.set.a(#000000, base.a) to base).pick(17)
+    return stepper(color.set_a(#000000, base.a) to base).pick(17)
   }
   tintSteps(base: color, target: color) -> list<color> {
-    return stepper(base to color.set.a(target, base.a)).pick(17)
+    return stepper(base to color.set_a(target, base.a)).pick(17)
   }
   lightStep(tones: list<color>, position: f32) -> color {
     return tones[clamp(round(position * 16.0), 0, 16)]

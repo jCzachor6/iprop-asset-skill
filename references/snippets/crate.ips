@@ -28,29 +28,29 @@ asset Crate {
     // Hashed choice: a rolled kind renders exactly like the same kind forced.
     look = clamp(kind, 0, 2)
     if (look == 0) {
-      stream_push(hash(start ^ kindKey))
+      stream.push(hash(start ^ kindKey))
       look = 1 to 2 with kinds
-      stream_pop()
+      stream.pop()
     }
 
     // Shape: its own stream, every roll whatever the kind.
-    stream_push(hash(start ^ shapeKey))
+    stream.push(hash(start ^ shapeKey))
     half = lerp(8.0, 13.0, 0.0 to 1.0 with typical)
     tall = lerp(12.0, 22.0, 0.0 to 1.0 with typical)
     lean = -1.0 to 1.0 with gaussian(mean = 0.0, sigma = 0.4)
     planks = 2 to 4
     damaged = chance(0.25)
     stainX = wobble.pick() * 3.0
-    stream_pop()
+    stream.pop()
 
     // Colours: a material (rolled once), an override, palette picks.
-    stream_push(hash(start ^ colorKey))
+    stream.push(hash(start ^ colorKey))
     wood = looks.Wood()
     iron = looks.Iron()
     stain = stains[index(3)]
     grain = pick(1, 2, 2, 3)
-    stream_pop()
-    if (tint.a != 0) { wood = looks.Wood(base = color.set.a(tint, 255)) }
+    stream.pop()
+    if (tint.a != 0) { wood = looks.Wood(base = color.set_a(tint, 255)) }
     tones = stepper(wood.shadow to wood.light).pick(5)
 
     // Draw once into a layer, outline it from its mask, paint it.

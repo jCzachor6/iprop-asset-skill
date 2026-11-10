@@ -100,7 +100,7 @@ asset Sword {
     if (enchant == 0) { lit = md(hash(seed ^ enchantKey), 2) }
 
     // Geometry has its own stream. Every roll happens before render choices.
-    stream_push(hash(seed ^ shapeKey))
+    stream.push(hash(seed ^ shapeKey))
     profile = 0 to 5
     // Proportions cluster around the typical weapon; extremes stay rare.
     dimensions = proportions.pick(5)
@@ -112,7 +112,7 @@ asset Sword {
     pommelStyle = 0 to 5
     fitRoll = dimensions[3]
     bendRoll = dimensions[4]
-    stream_pop()
+    stream.pop()
 
     bladeLength = 61.0 + lengthRoll * 5.0
     bladeWidth = 4.8 + widthRoll * 1.0
@@ -149,7 +149,7 @@ asset Sword {
 
     // Colours have a stream of their own and are all rolled, whatever the
     // quality, so they never move the construction or each other.
-    stream_push(hash(seed ^ colorKey))
+    stream.push(hash(seed ^ colorKey))
     metal = fittingMetals[index(3)]
     leather = grips[index(4)]
     stone = stones[index(4)]
@@ -157,7 +157,7 @@ asset Sword {
     soldierMetal = soldierMetals[index(3)]
     soldierGrip = soldierGrips[index(3)]
     handle = handles[index(4)]
-    stream_pop()
+    stream.pop()
     if (ornament == 1) { metal = color.mix(metal, #e1d6b3, 0.25) }
     else if (ornament == 2) {
       metal = color.mix(metal, #b78c55, 0.20)
@@ -168,13 +168,13 @@ asset Sword {
       leather = color.mix(leather, #4f2632, 0.40)
       stone = color.mix(stone, #964257, 0.55)
     }
-    stream_push(hash(seed ^ magicKey))
+    stream.push(hash(seed ^ magicKey))
     magicId = 1 to 24
     power = 1 to 4 with powers
-    stream_pop()
+    stream.pop()
     if (magicPalette == 0) { magicId = 0 }
     else if (magicPalette >= 2 && magicPalette <= 25) { magicId = int(magicPalette) - 1 }
-    glowColour = color.set.a(magic, 255)
+    glowColour = color.set_a(magic, 255)
     if (magicId > 0) { glowColour = enchantmentColor(magicId) }
     if (glowStrength >= 1 && glowStrength <= 4) { power = int(glowStrength) }
     blurSigma = 1.8
@@ -185,9 +185,9 @@ asset Sword {
     cx = 60.5
     cy = 60.5
 
-    stream_push(hash(seed ^ tierKey))
+    stream.push(hash(seed ^ tierKey))
     tier = 1 to 3 with tiers
-    stream_pop()
+    stream.pop()
     if (quality >= 1 && quality <= 3) { tier = int(quality) }
     common = tier == 1
     soldier = tier == 3
@@ -229,7 +229,7 @@ asset Sword {
         curve({cx, cy}, {cx - bladeLength * 0.35, cy - bladeLength * 0.35},
               {cx + (bend - bladeLength) * 0.70710678,
                cy - (bend + bladeLength) * 0.70710678},
-              bladeWidth * 1.1, color.set.a(glowColour, 28 + power * 12))
+              bladeWidth * 1.1, color.set_a(glowColour, 28 + power * 12))
       }
       surface.paint(aura.blur(min(blurSigma, 2.4)), blend=surface.source_over)
     }
@@ -250,13 +250,13 @@ asset Sword {
       guardReach = 6.5 + guardRoll * 3.0 + (bladeWidth - 3.4) * 0.4
       gripLength = 10.5 + (gripLength - 10.5) * 0.77
       // Independent material stream: recolouring never rerolls the fittings.
-      stream_push(hash(seed ^ finishKey))
+      stream.push(hash(seed ^ finishKey))
       family = 1 to 3 with finishFamilies
       finishId = 1 to 16
       silverId = 17 to 24
       rareId = 25 to 40
       toneOffset = -3 to 3
-      stream_pop()
+      stream.pop()
       if (family == 2) { finishId = silverId }
       if (family == 3) { finishId = rareId }
       if (finish >= 1 && finish <= 40) {
@@ -266,10 +266,10 @@ asset Sword {
       wear = 1.0
       if (finishId >= 25) {
         // Cleanliness and tone vary independently, without rerolling the hue.
-        stream_push(hash(seed ^ toneKey))
+        stream.push(hash(seed ^ toneKey))
         cleanId = 1 to 5
         toneId = 1 to 5
-        stream_pop()
+        stream.pop()
         if (tone >= 1 && tone <= 5) { toneId = int(tone) }
         toneOffset = toneOffset + (toneId - 2) * 8
       }
@@ -317,9 +317,9 @@ asset Sword {
   const distribution rustMixture = weighted {1: 25, 2: 25, 3: 25, 4: 7, 5: 6, 6: 7, 7: 5}
 
   rollRust(mode: i32) -> i32 {
-    stream_push(hash(seed ^ rustKey))
+    stream.push(hash(seed ^ rustKey))
     look = 1 to 7 with rustMixture
-    stream_pop()
+    stream.pop()
     if (mode >= 1 && mode <= 8) { look = mode }
     return look
   }

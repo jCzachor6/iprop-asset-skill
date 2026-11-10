@@ -6,6 +6,6 @@ expected_outcome: |
   palettes instead of channel-by-channel draws, the style input defaults to rolling from the seed,
   the body is painted in rows rather than a per-pixel loop (lower fuel), the barrel is shaded with
   a tone ramp and has a readable edge, and seeds differ visibly in shape and colour. It compiles
-  with 0.9.0 and renders seeds 1-200 without traps.
+  with 1.0.0 and renders seeds 1-200 without traps.
 context:
   scaffold_script: place-files.sh

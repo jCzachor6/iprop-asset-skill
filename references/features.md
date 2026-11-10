@@ -142,19 +142,19 @@ The layout every model uses:
     start = seed                      // the game's seed, before any draw moves it
     look = clamp(kind, 0, 5)
     if (look == 0) { look = rolledKind(start) }   // hashed, so rolled == forced
-    stream_push(hash(start ^ shapeKey))           // the shape: every roll, whatever the family
+    stream.push(hash(start ^ shapeKey))           // the shape: every roll, whatever the family
     size = 0.0 to 1.0 with typical
     lean = -2.0 to 2.0 with gaussian(mean = 0.0, sigma = 0.8)
-    stream_pop()
-    stream_push(hash(start ^ colorKey))           // the colours: materials and families
+    stream.pop()
+    stream.push(hash(start ^ colorKey))           // the colours: materials and families
     bark = wood.Bark()
-    stream_pop()
+    stream.pop()
 ...
   // The kind a seed rolls: weighted, in a stream of its own.
   rolledKind(start: i32) -> i32 {
-    stream_push(hash(start ^ kindKey))
+    stream.push(hash(start ^ kindKey))
     look = 1 to 5 with kinds
-    stream_pop()
+    stream.pop()
     return look
   }
 ```
@@ -162,7 +162,7 @@ The layout every model uses:
 A single value needs no stream of its own: `roll(hash(start ^ phaseKey), 0.0, 3.0)` draws a
 uniform number and `choose(hash(start ^ guardKey), 0, 1, 1, 2)` one of its values (repeat one to
 weight it), each from an isolated stream. A weighted roll goes into a small helper like
-`rolledKind`; a group of values shares one `stream_push`/`stream_pop`.
+`rolledKind`; a group of values shares one `stream.push`/`stream.pop`.
 
 Why `hash(start ^ shapeKey)` and not just `seed`: `seed` reads the current state of the stream; XOR
 with a key labels a purpose (the shape, the colours, the third part); `hash` (splitmix32) mixes the
@@ -196,18 +196,22 @@ the seed and the inputs, not the picture. After a restructuring, run
 
 ## 6. Budget
 
-Every instruction spends fuel from 5,000,000 per generation; parts spend from the same budget.
-Paint rows, not pixels; draw a texture once as a layer or a mask and reuse it (the butterfly tiles
-its scale mask with `mask.offset`), or make it one `noise.mask` (the butterfly's single program
-draws its marble so, where a pixel loop needs a whole budget); when one feature needs a whole
-budget for detail, make it a program of its own that the game composes (the butterfly's
-`forewing.ips` and `hindwing.ips`). The check reports the heaviest seeds; look at them, they are
-usually the most complex looks.
+Every instruction spends fuel, and parts spend from their root's budget. A program compiled with
+1.0 may spend 25,000,000 per generation (0.9 allowed 5,000,000), but that is a ceiling, not a
+target: fuel is generation time, and a game generates many props. Paint rows, not pixels; draw a
+texture once as a layer or a mask and reuse it (the butterfly tiles its scale mask with
+`mask.offset`), or make it one `noise.mask` (the butterfly's single program draws its marble so,
+where the pixel loop costs several times as much); when one feature needs millions of fuel for its
+detail, make it a program of its own that the game composes and caches (the butterfly's
+`forewing.ips` and `hindwing.ips`, split when a program had 5,000,000). The check reports the
+heaviest seeds; look at them, they are usually the most complex looks.
 
-0.9 charges less for masks, layers, blur and painting than 0.8 did: the same butterfly spends
-about a quarter less, the shield about half. Compare fuel only within one release. Hosts also
-stop a generation at a separate limit of 100,000,000 work units, and may add a deadline; the fuel
-budget is what an asset can plan for.
+Fuel is priced as in 0.9, which charges less for masks, layers, blur and painting than 0.8 did
+(the same butterfly spends about a quarter less, the shield about half). The 1.0 compiler also
+emits less code around loops, so a recompiled asset spends a few percent less again. Compare fuel
+only within one release. Hosts also stop a generation at a separate limit of 100,000,000 work
+units, and may add a deadline. An asset can plan for its fuel budget, with one exception: a
+program made almost only of noise masks reaches the work limit first, at about 16,000,000 fuel.
 
 ## 7. Write it down
 

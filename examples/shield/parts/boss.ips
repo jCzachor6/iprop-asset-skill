@@ -113,7 +113,7 @@ asset ShieldBoss {
   plate(h: i32, diamond: i32, tones: list<color>, edge: color) {
     s = float(h)
     layer slab(alpha = surface.source_over) {
-      if (diamond) { poly(solid, cx, cy - s - 1.0, cx + s + 1.0, cy, cx, cy + s + 1.0, cx - s - 1.0, cy) }
+      if (diamond) { poly(cx, cy - s - 1.0, cx + s + 1.0, cy, cx, cy + s + 1.0, cx - s - 1.0, cy, solid) }
       else { rect(cx - s, cy - s, s * 2.0, s * 2.0, solid) }
     }
     mask shape = mask.from(slab)

@@ -100,13 +100,13 @@ asset Shield {
     // the same shape forced
     look = clamp(shape, 0, 8)
     if (look == 0) {
-      stream_push(hash(seed ^ familyKey))
+      stream.push(hash(seed ^ familyKey))
       look = 1 to 8 with shapes
-      stream_pop()
+      stream.pop()
     }
 
     // ---- the build: every roll, whatever the family ----------------------------
-    stream_push(hash(seed ^ buildKey))
+    stream.push(hash(seed ^ buildKey))
     sizeRoll = 0.0 to 1.0 with typical
     tallRoll = 0.0 to 1.0 with typical
     bendRoll = 0.0 to 1.0 with typical
@@ -116,7 +116,7 @@ asset Shield {
     bossStyle = 1 to 5 with bossStyles
     studded = chance(0.45)
     wear = 0.0 to 1.0 with beta(alpha = 1.5, beta = 4.0)
-    stream_pop()
+    stream.pop()
 
     half = lerp(15.0, 19.5, sizeRoll)            // 1 round
     tall = half * 2.0
@@ -147,9 +147,9 @@ asset Shield {
     if (rimRoll > 0.75 && look != 4) { rimW = 3 }
 
     // ---- the body: wood or metal; bucklers lean metal, towers wood -------------
-    stream_push(hash(seed ^ bodyKey))
+    stream.push(hash(seed ^ bodyKey))
     metalRoll = 0.0 to 1.0
-    stream_pop()
+    stream.pop()
     metalShare = 0.32
     if (look == 4) { metalShare = 0.75 } else if (look == 6) { metalShare = 0.15 }
     built = 1
@@ -157,7 +157,7 @@ asset Shield {
     if (body == 1 || body == 2) { built = body }
 
     // ---- colours: materials, the rim's look, the paints ------------------------
-    stream_push(hash(seed ^ colorKey))
+    stream.push(hash(seed ^ colorKey))
     wood = mats.Wood()
     plate = mats.Metal()
     band = mats.Metal()
@@ -171,7 +171,7 @@ asset Shield {
     chargeTone = colours[0 to 4 with hues].pick()
     chargeMetal = metalTints[0 to 1].pick()
     chargeIsMetal = chance(0.5)
-    stream_pop()
+    stream.pop()
 
     rimKind = 1                                  // a metal band
     rimColour = band.base
@@ -193,11 +193,11 @@ asset Shield {
     if (studded && rimKind != 2) { studs = 1 }
 
     // ---- paint: a field on some wooden boards, an emblem on about half --------
-    stream_push(hash(seed ^ paintKey))
+    stream.push(hash(seed ^ paintKey))
     fieldRoll = 0.0 to 1.0
     hasEmblem = chance(0.5)
     design = 1 to 13 with designs
-    stream_pop()
+    stream.pop()
     // A buckler's face is a thin ring around its big boss: it stays bare
     // unless an emblem is forced.
     painted = 0
@@ -210,7 +210,7 @@ asset Shield {
 
     fieldColour = fieldTone
     if (fieldIsMetal) { fieldColour = fieldMetal }
-    if (paint.a != 0 && painted == 1) { fieldColour = color.set.a(paint, 255) }
+    if (paint.a != 0 && painted == 1) { fieldColour = color.set_a(paint, 255) }
     // The emblem keeps the rule of tincture: a colour on a metal (a steel,
     // silver or gilt plate, a gold or silver field), a metal on a colour (a
     // dark plate, a coloured field). On bare wood, the rolled kind of
@@ -231,7 +231,7 @@ asset Shield {
       gap = abs(luma(chargeColour) - luma(under))
       if (gap < 60.0 && abs(luma(other) - luma(under)) > gap) { chargeColour = other }
     }
-    if (paint.a != 0 && painted == 0) { chargeColour = color.set.a(paint, 255) }
+    if (paint.a != 0 && painted == 0) { chargeColour = color.set_a(paint, 255) }
 
     // ---- the parts, drawn into one image: a damaged shield is cut from it --------
     field = #00000000
@@ -300,7 +300,7 @@ asset Shield {
       // of a Voronoi diagram whose sites ring the hit, so they all run out
       // from it. The hit draws from a stream of its own, so the shield above
       // stays exactly as it was.
-      stream_push(hash(seed ^ impactKey))
+      stream.push(hash(seed ^ impactKey))
       side = 0.0 to 6.2832
       out = 0.0 to 1.0 with typical
       turn = 0.0 to 6.2832
@@ -308,7 +308,7 @@ asset Shield {
       // Unequal distances, so the cracks meet near the hit, not in one point.
       rings = [3.0 to 4.4, 3.0 to 4.4, 3.0 to 4.4, 3.0 to 4.4, 3.0 to 4.4]
       run = lerp(8.0, 15.0, 0.0 to 1.0 with typical)
-      stream_pop()
+      stream.pop()
       hit = bossAt + heading(side) * lerp(reach + 1.0, max(reach + 1.5, room.x - 2.0), out)
       spokes = [hit + heading(turn + bends[0]) * rings[0], hit + heading(turn + 1.2566 + bends[1]) * rings[1],
                 hit + heading(turn + 2.5133 + bends[2]) * rings[2], hit + heading(turn + 3.7699 + bends[3]) * rings[3],
